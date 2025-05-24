@@ -1,0 +1,20 @@
+name: Lean Action CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install linker (lld)
+        run: sudo apt-get update && sudo apt-get install -y lld
+      - uses: leanprover/lean-action@v1
+        with:
+          build: "true"
+          test: "true"
+          # lean4checker: "true"

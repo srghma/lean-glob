@@ -1,0 +1,332 @@
+def compDefault : CompOptions := {}
+
+def compPosix : CompOptions := {
+  numberRanges := false,
+  recursiveWildcards := false,
+  pathSepInRanges := false
+}
+
+def matchDefault : MatchOptions := matchPosix
+
+def matchPosix : MatchOptions := {}
+
+def isLeft {α β : Type} : α ⊕ β → Bool
+  | Sum.inl _ => true
+  | Sum.inr _ => false
+
+def fromLeft {α β : Type} : α ⊕ β → α
+  | Sum.inl x => x
+  | Sum.inr _ => panic! "fromLeft on Right"
+
+def dropLeadingZeroes (s : String) : String :=
+  let trimmed := s.dropWhile (· == '0')
+  if trimmed.isEmpty then "0" else trimmed
+
+def isPathSeparator (c : Char) : Bool := c == '/' || c == '\\'
+
+def isExtSeparator (c : Char) : Bool := c == '.'
+
+def pathSeparator : Char := '/'
+
+def extSeparator : Char := '.'
+
+def inRange {α : Type} [Ord α] (range : α × α) (c : α) : Bool :=
+  range.1 ≤ c && c ≤ range.2
+
+def overlap {α : Type} [Ord α] (r1 r2 : α × α) : Option (α × α) :=
+  if r1.2 ≥ r2.1 then
+    if r1.2 ≥ r2.2 then
+      if r1.1 ≤ r2.1 then some (r1.1, r1.2) else some (r2.1, r1.2)
+    else
+      if r1.1 ≤ r2.1 then some (r1.1, r2.2) else some (r2.1, r2.2)
+  else none
+
+def addToRange {α : Type} [Ord α] [Enum α] (range : α × α) (c : α) : Option (α × α) :=
+  if inRange range c then some range
+  else if c == Enum.pred range.1 then some (c, range.2)
+  else if c == Enum.succ range.2 then some (range.1, c)
+  else none
+
+def increasingSeq {α : Type} [BEq α] [Enum α] : List α → List α × List α
+  | [] => ([], [])
+  | x :: xs => go [x] xs
+where
+  go (is : List α) : List α → List α × List α
+    | [] => (is, [])
+    | y :: ys =>
+      match is with
+      | i :: _ => if y == Enum.succ i then go (y :: is) ys else (is, y :: ys)
+      | [] => ([], y :: ys)
+
+def tokToLower : Token → Token
+  | Token.literal c => Token.literal c.toLower
+  | Token.longLiteral n s => Token.longLiteral n (s.map Char.toLower)
+  | tok => tok
+
+instance : ToString Token where
+  toString := fun
+    | Token.literal c =>
+      if c ∈ ['*', '?', '[', '<'] then s!"[{c}]" else s!"{c}"
+    | Token.extSeparator => s!"{extSeparator}"
+    | Token.pathSeparator => s!"{pathSeparator}"
+    | Token.nonPathSeparator => "?"
+    | Token.anyNonPathSeparator => "*"
+    | Token.anyDirectory => "**/"
+    | Token.longLiteral _ s => s.toList.map (toString ∘ Token.literal) |>.foldl (· ++ ·) ""
+    | Token.openRange a b => s!"<{a.getD ""}-{b.getD ""}>"
+    | Token.charRange b r =>
+      let chars := r.map (fun
+        | Sum.inl c => s!"{c}"
+        | Sum.inr (x, y) => s!"{x}-{y}")
+      s!"[{if b then "" else "^"}{chars.foldl (· ++ ·) ""}]"
+    | Token.unmatchable => "[.]"
+
+instance : ToString Pattern where
+  toString p := p.tokens.map toString |>.foldl (· ++ ·) ""
+
+def openRangeNum (s : String) : Option String :=
+  some (dropLeadingZeroes s)
+
+def openRange (s : String) : Except String Token := do
+  match s.toList with
+  | ['-'] => pure $ Token.openRange none none
+  | '-' :: rest =>
+    let numStr := rest.asString
+    if numStr.all Char.isDigit then
+      pure $ Token.openRange none (openRangeNum numStr)
+    else
+      throw s!"bad <>, expected number, got {numStr}"
+  | _ =>
+    let (numPart, rest) := s.span Char.isDigit
+    match rest.toList with
+    | [] => throw s!"bad <>, expected number followed by - in {s}"
+    | ['-'] => pure $ Token.openRange (openRangeNum numPart) none
+    | '-' :: restChars =>
+      let restStr := restChars.asString
+      if restStr.all Char.isDigit then
+        pure $ Token.openRange (openRangeNum numPart) (openRangeNum restStr)
+      else
+        throw s!"bad <>, expected number, got {restStr}"
+    | _ => throw s!"bad <>, expected number followed by - in {s}"
+
+def isDigit (c : Char) : Bool := c.isDigit
+
+def isAlpha (c : Char) : Bool := c.isAlpha
+
+def charClass (name : String) : Except String (List (Char ⊕ (Char × Char))) :=
+  match name with
+  | "alnum" => pure [Sum.inr ('0', '9'), Sum.inr ('A', 'Z'), Sum.inr ('a', 'z')]
+  | "alpha" => pure [Sum.inr ('A', 'Z'), Sum.inr ('a', 'z')]
+  | "blank" => pure [Sum.inl '\t', Sum.inl ' ']
+  | "cntrl" => pure [Sum.inr ('\x00', '\x1f'), Sum.inl '\x7f']
+  | "digit" => pure [Sum.inr ('0', '9')]
+  | "graph" => pure [Sum.inr ('!', '~')]
+  | "lower" => pure [Sum.inr ('a', 'z')]
+  | "print" => pure [Sum.inr (' ', '~')]
+  | "punct" => pure [Sum.inr ('!', '/'), Sum.inr (':', '@'), Sum.inr ('[', '`'), Sum.inr ('{', '~')]
+  | "space" => pure [Sum.inr ('\t', '\r'), Sum.inl ' ']
+  | "upper" => pure [Sum.inr ('A', 'Z')]
+  | "xdigit" => pure [Sum.inr ('0', '9'), Sum.inr ('A', 'F'), Sum.inr ('a', 'f')]
+  | _ => throw s!"unknown character class '{name}'"
+
+partial def charRange (opts : CompOptions) (s : String) : Except String Token × String := do
+  let chars := s.toList
+  match chars with
+  | y :: ys when y ∈ ['^', '!'] =>
+    match ys with
+    | '-' :: ']' :: xs => (pure $ Token.charRange false [Sum.inl '-'], xs.asString)
+    | '-' :: _ => parseCharRange true chars
+    | xs => parseCharRange false xs
+  | _ => parseCharRange true chars
+where
+  parseCharRange (positive : Bool) (chars : List Char) : Except String Token × String := do
+    let (ranges, rest) := processChars chars []
+    match ranges with
+    | Except.ok rs => (pure $ Token.charRange positive rs, rest)
+    | Except.error e => (throw e, "")
+
+  processChars : List Char → List (Char ⊕ (Char × Char)) → Except (List (Char ⊕ (Char × Char))) × String
+    | [], acc => (pure acc.reverse, "")
+    | ']' :: rest, acc => (pure acc.reverse, rest.asString)
+    | c :: '-' :: x :: xs, acc when x ≠ ']' =>
+      if ¬opts.pathSepInRanges ∧ (isPathSeparator c ∨ isPathSeparator x) then
+        (throw [], "")
+      else
+        processChars xs (Sum.inr (c, x) :: acc)
+    | c :: xs, acc =>
+      if ¬opts.pathSepInRanges ∧ isPathSeparator c then
+        (throw [], "")
+      else
+        processChars xs (Sum.inl c :: acc)
+
+def tokenize (opts : CompOptions) (s : String) : Except String Pattern := do
+  let tokens ← go s.toList []
+  pure ⟨tokens.reverse⟩
+where
+  go : List Char → List Token → Except String (List Token)
+    | [], acc => pure acc
+    | '?' :: cs, acc when opts.wildcards => go cs (Token.nonPathSeparator :: acc)
+    | '*' :: cs, acc when opts.wildcards =>
+      match cs with
+      | '*' :: p :: xs when opts.recursiveWildcards ∧ isPathSeparator p =>
+        go xs (Token.anyDirectory :: acc)
+      | _ => go cs (Token.anyNonPathSeparator :: acc)
+    | '[' :: cs, acc when opts.characterRanges =>
+      let (rangeResult, rest) := charRange opts cs.asString
+      match rangeResult with
+      | Except.ok token => go rest.toList (token :: acc)
+      | Except.error e =>
+        if opts.errorRecovery then go cs (Token.literal '[' :: acc)
+        else throw e
+    | '<' :: cs, acc when opts.numberRanges =>
+      let (rangeStr, rest) := cs.asString.span (· ≠ '>')
+      match rest.toList with
+      | [] =>
+        if opts.errorRecovery then go cs (Token.literal '<' :: acc)
+        else throw "unclosed <> in pattern"
+      | '>' :: restChars =>
+        match openRange rangeStr with
+        | Except.ok token => go restChars (token :: acc)
+        | Except.error e =>
+          if opts.errorRecovery then go cs (Token.literal '<' :: acc)
+          else throw e
+      | _ =>
+        if opts.errorRecovery then go cs (Token.literal '<' :: acc)
+        else throw "unclosed <> in pattern"
+    | c :: cs, acc =>
+      let token :=
+        if isPathSeparator c then Token.pathSeparator
+        else if isExtSeparator c then Token.extSeparator
+        else Token.literal c
+      go cs (token :: acc)
+
+def isCharLiteral : Token → Option Char
+  | Token.literal c => some c
+  | _ => none
+
+def spanMaybe {α β : Type} (f : α → Option β) : List α → List β × List α
+  | [] => ([], [])
+  | x :: xs =>
+    match f x with
+    | none => ([], x :: xs)
+    | some y =>
+      let (ys, zs) := spanMaybe f xs
+      (y :: ys, zs)
+
+def optimizeCharRange (precededBySlash : Bool) : Token → Token
+  | Token.charRange b rs =>
+    let sorted := rs.mergeSort (fun a b =>
+      let getChar : Char ⊕ (Char × Char) → Char
+        | Sum.inl c => c
+        | Sum.inr (c, _) => c
+      getChar a ≤ getChar b)
+
+    let filtered := if b then
+      sorted.filter (fun x =>
+        ¬precededBySlash ∨ (x ≠ Sum.inl '.' ∧ x ≠ Sum.inl '/'))
+    else sorted
+
+    match filtered with
+    | [Sum.inl c] when b =>
+      if isPathSeparator c then Token.unmatchable else Token.literal c
+    | [Sum.inr (c1, c2)] when b ∧ c1 == Char.ofNat 0 ∧ c2 == Char.ofNat 1114111 =>
+      Token.nonPathSeparator
+    | _ => Token.charRange b filtered
+  | tok => tok
+
+def optimize (p : Pattern) : Pattern :=
+  let optimized := optimizeTokens p.tokens
+  ⟨combineConsecutiveLiterals optimized⟩
+where
+  optimizeTokens : List Token → List Token
+    | [] => []
+    | Token.extSeparator :: xs => Token.literal '.' :: optimizeTokens xs
+    | Token.pathSeparator :: Token.extSeparator :: xs =>
+      Token.pathSeparator :: Token.literal '.' :: optimizeTokens xs
+    | Token.pathSeparator :: (cr@(Token.charRange _ _)) :: xs =>
+      Token.pathSeparator :: optimizeCharRange true cr :: optimizeTokens xs
+    | (cr@(Token.charRange _ _)) :: xs =>
+      optimizeCharRange false cr :: optimizeTokens xs
+    | x :: xs => x :: optimizeTokens xs
+
+  combineConsecutiveLiterals : List Token → List Token
+    | [] => []
+    | x :: y :: xs =>
+      match isCharLiteral x, isCharLiteral y with
+      | some c1, some c2 =>
+        let (chars, rest) := spanMaybe isCharLiteral xs
+        let allChars := c1 :: c2 :: chars
+        let combined := Token.longLiteral allChars.length (allChars.asString)
+        combineConsecutiveLiterals (combined :: rest)
+      | _, _ => x :: combineConsecutiveLiterals (y :: xs)
+    | [x] => [x]
+
+def compile (s : String) : Pattern :=
+  compileWith compDefault s
+
+def compileWith (opts : CompOptions) (s : String) : Pattern :=
+  match tryCompileWith opts s with
+  | Except.ok p => p
+  | Except.error e => panic! e
+
+def tryCompileWith (opts : CompOptions) (s : String) : Except String Pattern := do
+  let pattern ← tokenize opts s
+  pure (optimize pattern)
+
+def decompile (p : Pattern) : String := toString p
+
+def isLiteral (p : Pattern) : Bool :=
+  p.tokens.all fun
+    | Token.literal _ => true
+    | Token.longLiteral _ _ => true
+    | Token.pathSeparator => true
+    | _ => false
+
+def pathParts (p : String) : List String :=
+  let parts := p.split isPathSeparator
+  parts.scanl (· ++ "/" ++ ·) "" |>.tail!
+
+def simplify (p : Pattern) : Pattern :=
+  ⟨simplifyTokens (removeLeadingDotSlash p.tokens)⟩
+where
+  removeLeadingDotSlash : List Token → List Token
+    | Token.extSeparator :: Token.pathSeparator :: xs =>
+      removeLeadingDotSlash (xs.dropWhile (· == Token.pathSeparator))
+    | xs => xs
+
+  simplifyTokens : List Token → List Token
+    | [] => []
+    | Token.pathSeparator :: Token.extSeparator :: (ps@(Token.pathSeparator :: _)) :: xs =>
+      simplifyTokens (ps :: xs)
+    | x :: xs =>
+      if x == Token.pathSeparator then
+        let (compressed, ys) := xs.span (· == Token.pathSeparator)
+        if compressed.isEmpty then x :: simplifyTokens ys
+        else simplifyTokens (x :: ys)
+      else x :: simplifyTokens xs
+
+def literal (s : String) : Pattern :=
+  optimize ⟨s.toList.map fun c =>
+    if isPathSeparator c then Token.pathSeparator
+    else if isExtSeparator c then Token.extSeparator
+    else Token.literal c⟩
+
+def singleWildcard : Pattern := ⟨[Token.nonPathSeparator]⟩
+
+def wildcard : Pattern := ⟨[Token.anyNonPathSeparator]⟩
+
+def recursiveWildcard : Pattern := ⟨[Token.anyDirectory]⟩
+
+def charRangePattern (b : Bool) (rs : List (Char ⊕ (Char × Char))) : Pattern :=
+  optimize ⟨[Token.charRange b rs]⟩
+
+def numberRange (a b : Option Int) : Pattern :=
+  ⟨[Token.openRange (a.map toString) (b.map toString)]⟩
+
+instance : Append Pattern where
+  append p1 p2 := optimize ⟨p1.tokens ++ p2.tokens⟩
+
+instance : EmptyCollection Pattern where
+  emptyCollection := ⟨[]⟩
+
+end System.FilePath.Glob
