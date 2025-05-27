@@ -75,23 +75,46 @@ elab "patternNonWFStrict" pat:str : term => do
 
 -------------
 
+-- ended with "**": "**/**" ⛔, "**/foo/**" ✅, "**/*/**" ⛔, "**/foo/*/**" ⛔, "**/*/foo/**" ⛔
+-- stars with "**": "**/**" ⛔, "**/foo/**" ✅, "**/*/**" ⛔, "**/foo/*/**" ⛔, "**/*/foo/**" ⛔
+
+
+
 inductive OneStarOrLit where
   | oneStar : OneStarOrLit
   | lit : NonEmptyString -> OneStarOrLit
   deriving Inhabited, Repr, BEq, Ord, Hashable, DecidableEq
 
-inductive DoubleStarOnStartOrEnd where
-  | none : DoubleStarOnStartOrEnd -- pattern was like `anything/file.txt`
-  | onStart : DoubleStarOnStartOrEnd -- pattern was like `**/anything/file.txt`
-  | onEnd : DoubleStarOnStartOrEnd -- pattern was like `anything/**/file.txt`
-  | onStartAndEnd : DoubleStarOnStartOrEnd -- pattern was like `**/anything/**/file.txt`
+inductive PatternEnding : Bool -> List a -> Type where
+  | anyDeeply : PatternEnding false anyList
+  | fileDeeply : NonEmptyString -> PatternEnding anyBool anyList -- ending was "**/foo"
+  | wholeCurDir : PatternEnding anyBool anyList -- ending was "*"
+  | oneFileInCurDir : NonEmptyString -> PatternEnding anyBool anyList -- ending was "foo"
   deriving Inhabited, Repr, BEq, Ord, Hashable, DecidableEq
 
 structure Pattern where
-  doubleStarOnStartOrEnd : DoubleStarOnStartOrEnd
+  beginningHasDoubleStar : Bool
   dirs : List (NonEmptyList OneStarOrLit)
-  file : OneStarOrLit
+  ending : PatternEnding beginningHasDoubleStar dirs
   deriving Inhabited, Repr, BEq, Ord, Hashable, DecidableEq
+
+-- | Input Pattern                | Segments Parsed                         |                                      | Output Pattern                                               |
+-- | ---------------------------- | --------------------------------------- |                                      | ------------------------------------------------------------ |
+-- | `""`                         | `[]`                                    | IMPOSSIBLE                           | `none × [] × *` (just return match all files in current dir) |
+-- | `"**"`                       | `[**]`                                  | false ×                                     | `onStart × [] × *` (default fallback for file?)       | -- curr onStartAndEnd
+-- | `"*"`                        | `[*]`                                   |                                      | `none × [] × *`                                              |
+-- | `"**/*"`                     | `[**, *]`                               |                                      | `onStart × [] × *`                                           |
+-- | `"**/**"`                    | `[**, **]`                              |                                      | `onStart × [] × *`                                           | -- curr onStartAndEnd
+-- | `"**/foo.txt"`               | `[**, "foo.txt"]`                       |                                      | `onStart × [] × "foo.txt"`                                   |
+-- | `"*/foo.txt"`                | `[*,"foo.txt"]`                         |                                      | `none × [[*]] × "foo.txt"`                                   |
+-- | `"*/*/foo.txt"`              | `[* , *, "foo.txt"]`                    |                                      | `none × [[*,*]] × "foo.txt"`                                 |
+-- | `"*/*/**/*/*/foo.txt"`       | `[* , *, **, *, *, "foo.txt"]`          |                                      | `none × [[*,*], [*,*]] × "foo.txt"`                          |
+-- | `"**/*/*"`                   | `[**, *, *]`                            |                                      | `onStart × [[*]] × *`                                        |
+-- | `"foo/bar.txt"`              | `["foo", "bar.txt"]`                    |                                      | `none × [["foo"]] × "bar.txt"`                               |
+-- | `"**/foo/*/bar.txt"`         | `[**, "foo", *, "bar.txt"]`             |                                      | `onStart × [["foo", *]] × "bar.txt"`                         |
+-- | `"**/foo/**/bar.txt"`        | `[**, "foo", **, "bar.txt"]`            |                                      | `onStartAndEnd × [["foo"]] × "bar.txt"`                      |
+-- | `"**/foo/**/**/bar.txt"`     | `[**, "foo", **, **, "bar.txt"]`        |                                      | `onStartAndEnd × [["foo"]] × "bar.txt"`                      |
+-- | `"**/foo/**/baz/**/bar.txt"` | `[**, "foo", **, "baz", **, "bar.txt"]` |                                      | `onStartAndEnd × [["foo"], ["baz"]] × "bar.txt"`             |
 
 instance : ToExpr OneStarOrLit where
   toTypeExpr := mkConst `OneStarOrLit
@@ -203,24 +226,6 @@ elab "patternStrict" pat:str : term => do
 
 #guard Pattern.fromPatternNonWF [] = Pattern.mk .none [] .oneStar
 #guard Pattern.fromPatternNonWF (patternNonWFLax"") = Pattern.mk .none [] .oneStar
-
--- | Input Pattern                | Segments Parsed                         | Output Pattern                                               |
--- | ---------------------------- | --------------------------------------- | ------------------------------------------------------------ |
--- | `""`                         | `[]`                                    | `none × [] × *` (just return match all files in current dir) |
--- | `"**"`                       | `[**]`                                  | `onStart × [] × *` (default fallback for file?)              | -- curr onStartAndEnd
--- | `"*"`                        | `[*]`                                   | `none × [] × *`                                              |
--- | `"**/*"`                     | `[**, *]`                               | `onStart × [] × *`                                           |
--- | `"**/**"`                    | `[**, **]`                              | `onStart × [] × *`                                           | -- curr onStartAndEnd
--- | `"**/foo.txt"`               | `[**, "foo.txt"]`                       | `onStart × [] × "foo.txt"`                                   |
--- | `"*/foo.txt"`                | `[*,"foo.txt"]`                         | `none × [[*]] × "foo.txt"`                                   |
--- | `"*/*/foo.txt"`              | `[* , *, "foo.txt"]`                    | `none × [[*,*]] × "foo.txt"`                                 |
--- | `"*/*/**/*/*/foo.txt"`       | `[* , *, **, *, *, "foo.txt"]`          | `none × [[*,*], [*,*]] × "foo.txt"`                          |
--- | `"**/*/*"`                   | `[**, *, *]`                            | `onStart × [[*]] × *`                                        |
--- | `"foo/bar.txt"`              | `["foo", "bar.txt"]`                    | `none × [["foo"]] × "bar.txt"`                               |
--- | `"**/foo/*/bar.txt"`         | `[**, "foo", *, "bar.txt"]`             | `onStart × [["foo", *]] × "bar.txt"`                         |
--- | `"**/foo/**/bar.txt"`        | `[**, "foo", **, "bar.txt"]`            | `onStartAndEnd × [["foo"]] × "bar.txt"`                      |
--- | `"**/foo/**/**/bar.txt"`     | `[**, "foo", **, **, "bar.txt"]`        | `onStartAndEnd × [["foo"]] × "bar.txt"`                      |
--- | `"**/foo/**/baz/**/bar.txt"` | `[**, "foo", **, "baz", **, "bar.txt"]` | `onStartAndEnd × [["foo"], ["baz"]] × "bar.txt"`             |
 
 #guard patternLax "" = Pattern.mk .none [] .oneStar
 #guard patternLax "**" = Pattern.mk .onStartAndEnd [] .oneStar
