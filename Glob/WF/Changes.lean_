@@ -1,0 +1,121 @@
+import Init.System.IO
+import Lean
+import Lean.Data.RBMap
+import Std.Data.HashSet
+import Lean.Data.RBTree
+import Init.System.IO
+import Lean.Elab.Term
+import Init.Meta
+import Lean.Parser.Term
+import Glob.Utils.NonEmptyString
+import Glob.Utils.NonEmptyList
+import Glob.Utils.NEFromTo
+-- import Mathlib.Data.List.Induction
+-- import Aesop
+import Glob.NonWF
+import Glob.WF
+
+-- import LeanCopilot
+
+open IO.FS
+open IO.FS (DirEntry FileType Metadata)
+open System (FilePath)
+
+lemma canFollow_anything_lit (prev : PatternSegmentNonWF) (s : NonEmptyString) : canFollow prev (.lit s) := by simp [canFollow]
+
+lemma isValidSequence_append_lit (segments : List PatternSegmentNonWF) (s : NonEmptyString)
+    (h : isValidSequence segments) : isValidSequence (segments ++ [.lit s]) := by
+  induction segments with
+  | nil =>
+    simp [isValidSequence]
+  | cons head tail ih =>
+    cases tail with
+    | nil =>
+      simp [isValidSequence]
+      exact canFollow_anything_lit head s
+    | cons head2 tail2 =>
+      simp [isValidSequence] at h ⊢
+      constructor
+      · exact h.1
+      · exact ih h.2
+
+lemma isValidSequence_cons_cons (a b : PatternSegmentNonWF) (rest : List PatternSegmentNonWF) :
+    isValidSequence (a :: b :: rest) ↔ canFollow a b ∧ isValidSequence (b :: rest) := by simp [isValidSequence]
+lemma canFollow_lit_oneStar (s : NonEmptyString) : canFollow (.lit s) .oneStar := by simp [canFollow]
+lemma canFollow_lit_doubleStar (s : NonEmptyString) : canFollow (.lit s) .doubleStar := by simp [canFollow]
+
+lemma isValidSequence_append_oneStar (segments : List PatternSegmentNonWF)
+    (h : isValidSequence segments)
+    (lastIsLit : ∃ s, segments.getLast? = some (.lit s)) :
+    isValidSequence (segments ++ [.oneStar]) := by
+  obtain ⟨s, hlast⟩ := lastIsLit
+  induction segments with
+  | nil =>
+    simp at hlast
+  | cons head tail ih =>
+    cases tail with
+    | nil =>
+      simp [List.getLast?] at hlast
+      subst hlast
+      simp [isValidSequence]
+      exact canFollow_lit_oneStar s
+    | cons head2 tail2 =>
+      simp [isValidSequence] at h ⊢
+      constructor
+      · exact h.1
+      · simp_all only [List.cons_append, forall_const, List.getLast?_cons_cons]
+
+lemma isValidSequence_append_doubleStar (segments : List PatternSegmentNonWF)
+    (h : isValidSequence segments)
+    (lastIsLit : ∃ s, segments.getLast? = some (.lit s)) :
+    isValidSequence (segments ++ [.doubleStar]) := by
+  obtain ⟨s, hlast⟩ := lastIsLit
+  induction segments with
+  | nil =>
+    simp at hlast
+  | cons head tail ih =>
+    cases tail with
+    | nil =>
+      simp [List.getLast?] at hlast
+      subst hlast
+      simp [isValidSequence]
+      exact canFollow_lit_doubleStar s
+    | cons head2 tail2 =>
+      simp [isValidSequence] at h ⊢
+      constructor
+      · exact h.1
+      · simp_all only [List.cons_append, forall_const, List.getLast?_cons_cons]
+
+-- Smart constructors that maintain validity
+def PatternValidated.single (seg : PatternSegmentNonWF) : PatternValidated :=
+  ⟨[seg], by simp [isValidSequence]⟩
+
+def PatternValidated.addOneStar (pv : PatternValidated) : Option PatternValidated :=
+  match h : pv.pattern.getLast? with
+  | some (.lit s) =>
+    some ⟨pv.pattern ++ [.oneStar],
+          isValidSequence_append_oneStar pv.pattern pv.valid_sequence ⟨s, h⟩⟩
+  | _ => none
+
+def PatternValidated.addDoubleStar (pv : PatternValidated) : Option PatternValidated :=
+  match h : pv.pattern.getLast? with
+  | some (.lit s) =>
+    some ⟨pv.pattern ++ [.doubleStar],
+          isValidSequence_append_doubleStar pv.pattern pv.valid_sequence ⟨s, h⟩⟩
+  | _ => none
+
+def PatternValidated.addLit (pv : PatternValidated) (s : NonEmptyString) : PatternValidated :=
+  ⟨pv.pattern ++ [.lit s], isValidSequence_append_lit pv.pattern s pv.valid_sequence⟩
+
+-- PatternValidated extensionality
+lemma PatternValidated.ext (pv1 pv2 : PatternValidated)
+    (h : pv1.pattern = pv2.pattern) : pv1 = pv2 := by
+  cases pv1 with
+  | mk p1 h1 =>
+    cases pv2 with
+    | mk p2 h2 =>
+      simp at h
+      subst h
+      congr
+
+#guard (PatternValidated.single .doubleStar |>.addLit (nes!"foo") |>.addDoubleStar).map (·.pattern) = .some [.doubleStar, nes!"foo", .doubleStar]

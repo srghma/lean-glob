@@ -1,5 +1,5 @@
-import Glob.NonEmptyString
-import Glob.NonEmptyList
+import Glob.Utils.NonEmptyString
+import Glob.Utils.NonEmptyList
 import Batteries.Data.List.Basic
 
 private abbrev LS := List String
