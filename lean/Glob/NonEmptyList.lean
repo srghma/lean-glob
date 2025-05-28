@@ -6,7 +6,7 @@ import Init.System.IO
 import Lean.Elab.Term
 import Lean.Parser.Term
 
-set_option diagnostics true
+/- set_option diagnostics true -/
 
 /-- A non-empty list structure -/
 structure NonEmptyList (α : Type u) where
@@ -140,11 +140,11 @@ example : NonEmptyList String := nel!["hello", "world"]
 example : NonEmptyList Nat := nel![10]
 
 -- Test basic operations
-#eval (nel![1, 2, 3]).head -- Should output 1
-#eval (nel![1, 2, 3]).tail -- Should output [2, 3]
-#eval (nel![1, 2, 3]).length -- Should output 3
+#guard (nel![1, 2, 3]).head = 1 -- Should output 1
+#guard (nel![1, 2, 3]).tail = [2, 3] -- Should output [2, 3]
+#guard (nel![1, 2, 3]).length = 3 -- Should output 3
 
-#eval (toExpr $ nel![1]) -- Should output 1
+-- #eval (toExpr $ nel![1]) -- Should output 1
 
 -- Elaborator-based version for compile-time evaluation
 -- elab "nel_elab!" "[" elems:term,* "]" : term => do

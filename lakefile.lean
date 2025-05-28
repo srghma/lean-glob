@@ -5,10 +5,20 @@ open Lake DSL System
 /- require importGraph from git "https://github.com/leanprover-community/import-graph.git" @ "main" -/
 
 require Regex from git "https://github.com/pandaman64/lean-regex.git" @ "main" / "regex"
-/- require "leanprover-community" / "mathlib" -/
+require "leanprover-community" / "mathlib"
 require "leanprover-community" / "batteries" @ git "main"
+require LeanCopilot from git "https://github.com/lean-dojo/LeanCopilot.git" @ "main"
+require aesop from git "https://github.com/leanprover-community/aesop"
 
-package glob
+-- package glob
+
+-- TODO: comment me out
+package glob {
+  moreLinkArgs := #[
+    "-L./.lake/packages/LeanCopilot/.lake/build/lib",
+    "-lctranslate2"
+  ]
+}
 
 @[default_target]
 lean_lib Glob where
