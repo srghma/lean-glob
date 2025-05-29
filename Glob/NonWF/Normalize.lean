@@ -7,13 +7,13 @@ import Init.System.IO
 import Lean.Elab.Term
 import Init.Meta
 import Lean.Parser.Term
-import Glob.Utils.NonEmptyString
-import Glob.Utils.NonEmptyList
+import Glob.Data.NonEmptyString
+import Glob.Data.NonEmptyList
 import Glob.Utils.NEFromTo
 -- import Mathlib.Data.List.Induction
 -- import Aesop
 -- import LeanCopilot
-import Glob.NonWF
+import Glob.NonWF.Types
 
 
 open IO.FS
@@ -29,6 +29,10 @@ def normalizeSegmentsGo (acc : List PatternSegmentNonWF) (remaining : List Patte
   | x :: rest => normalizeSegmentsGo (x :: acc) rest
 
 def normalizeSegments (ps : List PatternSegmentNonWF) : List PatternSegmentNonWF := (normalizeSegmentsGo [] ps).reverse
+
+-- TODO DList? idris2 SnocList? to prove easier?
+-- theorem normalizeSegments_id (xs : List PatternSegmentNonWF) :
+--   isValidSequence xs → normalizeSegments xs = xs
 
 #guard normalizeSegments (patternNonWFLax "") == (patternNonWFLax "")
 #guard normalizeSegments (patternNonWFLax "**") == (patternNonWFLax "**")

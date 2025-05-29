@@ -24,7 +24,8 @@ package glob
 @[default_target]
 lean_lib Glob {
   roots := #[`Glob]
-  defaultFacets := #[LeanLib.sharedFacet]
+  -- defaultFacets := #[LeanLib.sharedFacet]
+  globs := #[`Glob].map Glob.andSubmodules -- how to make `lake build` build modules even if they are not imported in top level?
 }
 
 

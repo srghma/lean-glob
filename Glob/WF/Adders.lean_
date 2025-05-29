@@ -7,10 +7,10 @@ import Init.System.IO
 import Lean.Elab.Term
 import Init.Meta
 import Lean.Parser.Term
-import Glob.Utils.NonEmptyString
-import Glob.Utils.NonEmptyList
+import Glob.Data.NonEmptyString
+import Glob.Data.NonEmptyList
 import Glob.Utils.NEFromTo
--- import Mathlib.Data.List.Induction
+-- import Mathlib.Data.List.Induction -- REQUIRED
 -- import Aesop
 import Glob.NonWF
 import Glob.WF

@@ -7,42 +7,20 @@ import Init.System.IO
 import Lean.Elab.Term
 import Init.Meta
 import Lean.Parser.Term
-import Glob.Utils.NonEmptyString
-import Glob.Utils.NonEmptyList
+import Glob.Data.NonEmptyString
+import Glob.Data.NonEmptyList
 import Glob.Utils.NEFromTo
 -- import Mathlib.Data.List.Induction
 -- import Aesop
 -- import LeanCopilot
-import Glob.NonWF
-import Glob.WF
+import Glob.NonWF.Types
+import Glob.WF.Types
+import Glob.WF.Elab
 
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 
-
-------------------------------
-
-
-------------------------------
-
---
--- -- Test the corrected approach
--- #check normalizeSegments_valid
--- #check PatternValidated.fromListNormalized
---
--- -- Example usage:
--- def testPattern : PatternValidated :=
---   PatternValidated.fromListNormalized (patternNonWFLax "**/*") (by simp)
---
--- #guard testPattern.pattern = [.oneStar, .doubleStar]
-
-------------------------------
-
--- elab "patternLax" pat:str : term => do
---   let s := pat.getString
---   return (Lean.toExpr (Pattern.fromPatternNonWF $ PatternNonWF'.fromStringLax s))
---
 -- elab "patternStrict" pat:str : term => do
 --   let s := pat.getString
 --   match PatternNonWF.fromStringStrict s with
@@ -59,14 +37,14 @@ open System (FilePath)
 -- #guard patternLax "**/**" = Pattern.mk .onStartAndEnd [] .oneStar
 -- #guard patternLax "**/foo.txt" = Pattern.mk .onStart [] (.lit (nes! "foo.txt"))
 -- #guard patternLax "*/foo.txt" = Pattern.mk .none [] .oneStar -- [nel![.oneStar]] (.lit (nes! "foo.txt"))
-/- #guard patternLax "*/*/foo.txt" = Pattern.mk .none [nel![.oneStar, .oneStar]] (.lit (nes! "foo.txt")) -/
-/- #guard patternLax "*/*/**/*/*/foo.txt" = Pattern.mk .none [nel![.oneStar, .oneStar], nel![.oneStar, .oneStar]] (.lit (nes! "foo.txt")) -/
-/- #guard patternLax "**/*/*" = Pattern.mk .onStart [nel![.oneStar]] .oneStar -/
-/- #guard patternLax "foo/bar.txt" = Pattern.mk .none [nel![.lit (nes! "foo")]] (.lit (nes! "bar.txt")) -/
-/- #guard patternLax "**/foo/*/bar.txt" = Pattern.mk .onStart [nel![.lit (nes! "foo"), .oneStar]] (.lit (nes! "bar.txt")) -/
-/- #guard patternLax "**/foo/**/bar.txt" = Pattern.mk .onStartAndEnd [nel![.lit (nes! "foo")]] (.lit (nes! "bar.txt")) -/
-/- #guard patternLax "**/foo/**/**/bar.txt" = Pattern.mk .onStartAndEnd [nel![.lit (nes! "foo")]] (.lit (nes! "bar.txt")) -/
-/- #guard patternLax "**/foo/**/baz/**/bar.txt" = Pattern.mk .onStartAndEnd [nel![.lit (nes! "foo")], nel![.lit (nes! "baz")]] (.lit (nes! "bar.txt")) -/
+-- #guard patternLax "*/*/foo.txt" = Pattern.mk .none [nel![.oneStar, .oneStar]] (.lit (nes! "foo.txt"))
+-- #guard patternLax "*/*/**/*/*/foo.txt" = Pattern.mk .none [nel![.oneStar, .oneStar], nel![.oneStar, .oneStar]] (.lit (nes! "foo.txt"))
+-- #guard patternLax "**/*/*" = Pattern.mk .onStart [nel![.oneStar]] .oneStar
+-- #guard patternLax "foo/bar.txt" = Pattern.mk .none [nel![.lit (nes! "foo")]] (.lit (nes! "bar.txt"))
+-- #guard patternLax "**/foo/*/bar.txt" = Pattern.mk .onStart [nel![.lit (nes! "foo"), .oneStar]] (.lit (nes! "bar.txt"))
+-- #guard patternLax "**/foo/**/bar.txt" = Pattern.mk .onStartAndEnd [nel![.lit (nes! "foo")]] (.lit (nes! "bar.txt"))
+-- #guard patternLax "**/foo/**/**/bar.txt" = Pattern.mk .onStartAndEnd [nel![.lit (nes! "foo")]] (.lit (nes! "bar.txt"))
+-- #guard patternLax "**/foo/**/baz/**/bar.txt" = Pattern.mk .onStartAndEnd [nel![.lit (nes! "foo")], nel![.lit (nes! "baz")]] (.lit (nes! "bar.txt"))
 
 
 

@@ -7,19 +7,14 @@ import Init.System.IO
 import Lean.Elab.Term
 import Init.Meta
 import Lean.Parser.Term
-import Glob.Utils.NonEmptyString
-import Glob.Utils.NonEmptyList
+import Glob.Data.NonEmptyString
+import Glob.Data.NonEmptyList
 import Glob.Utils.NEFromTo
--- import Mathlib.Data.List.Induction
--- import Aesop
--- import LeanCopilot
 
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 
-
---------------------------
 inductive PatternSegmentNonWF where
   | doubleStar : PatternSegmentNonWF
   | oneStar : PatternSegmentNonWF
@@ -28,6 +23,15 @@ inductive PatternSegmentNonWF where
 
 instance : Coe NonEmptyString PatternSegmentNonWF where
   coe a := .lit a
+
+open Lean Meta Elab
+
+instance : ToExpr PatternSegmentNonWF where
+  toTypeExpr := mkConst ``PatternSegmentNonWF
+  toExpr
+    | .lit nes => mkApp (mkConst ``PatternSegmentNonWF.lit) (toExpr nes)
+    | .oneStar => mkConst ``PatternSegmentNonWF.oneStar
+    | .doubleStar => mkConst ``PatternSegmentNonWF.doubleStar
 
 def PatternSegmentNonWF.toString : PatternSegmentNonWF → String
 | .doubleStar => "**"
@@ -38,7 +42,7 @@ instance : ToString PatternSegmentNonWF where
   toString := PatternSegmentNonWF.toString
 
 def PatternSegmentNonWF.fromNES (nes : NonEmptyString) : PatternSegmentNonWF :=
-  match nes.val with
+  match nes.toString with
   | "**" => .doubleStar
   | "*"  => .oneStar
   | _    => .lit nes
@@ -58,10 +62,20 @@ abbrev PatternNonWF' := List PatternSegmentNonWF
 abbrev PatternNonWF := NonEmptyList PatternSegmentNonWF
 
 def PatternNonWF'.toString (ps : PatternNonWF') : String := String.intercalate "/" (ps.map PatternSegmentNonWF.toString)
-def PatternNonWF'.fromStringStrict (s : String) : Option PatternNonWF' := (ToNE.Traverse.«LS->LNES» (s.split (· == '/'))).map (·.map PatternSegmentNonWF.fromNES)
 
-def PatternNonWF'.fromStringLax (s : String) : PatternNonWF' := (ToNE.FilterMap.«LS->LNES» (s.split (· == '/'))).map (PatternSegmentNonWF.fromNES)
+-- "" ok
+-- "/" not ok
+def PatternNonWF'.fromStringStrict (s : String) : Option PatternNonWF' :=
+  if s == "" then some [] -- empty pattern, OK
+  else
+    s.split (· == '/')
+    |> ToNE.Traverse.«LS->LNES»
+    |>.map (·.map PatternSegmentNonWF.fromNES)
 
+def PatternNonWF'.fromStringLax (s : String) : PatternNonWF' :=
+  s.split (· == '/')
+  |> ToNE.FilterMap.«LS->LNES»
+  |>.map PatternSegmentNonWF.fromNES
 
 def PatternNonWF.toString (ps : PatternNonWF) : String := PatternNonWF'.toString ps.toList
 def PatternNonWF.fromStringStrict (s : String) : Option PatternNonWF := PatternNonWF'.fromStringStrict s >>= NonEmptyList.fromList?

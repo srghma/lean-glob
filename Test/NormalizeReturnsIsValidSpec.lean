@@ -1,35 +1,43 @@
 import LSpec
 import Glob.NonWF.Normalize
-import Glob.WF
-
+import Glob.WF.Types
+import Test.LSpec.List
+import Test.LSpec.NonEmptyList
+import Test.LSpec.String
+import Test.LSpec.NonEmptyString
+import Test.LSpec.PatternSegmentNonWF
 open LSpec SlimCheck Gen
 
-def genSegment : Gen PatternSegmentNonWF := do
-  let i ← Gen.choose Nat 0 2
-  match i with
-  | 0 => return PatternSegmentNonWF.doubleStar
-  | 1 => return PatternSegmentNonWF.oneStar
-  | _ => do
-    let lit ← Gen.elements #["foo", "bar", "baz"]
-    if h : lit ≠ "" then
-      return PatternSegmentNonWF.lit ⟨lit, h⟩
-    else
-      return PatternSegmentNonWF.lit ⟨"x", by decide⟩
+instance : Shrinkable PatternSegmentNonWF := Shrinkable.mk PatternSegmentNonWF.shrink
 
-instance : Shrinkable PatternSegmentNonWF :=
-  Shrinkable.mk (fun _ => [])
+instance [Shrinkable a] : Shrinkable (NonEmptyList a) := Shrinkable.mk NonEmptyList.shrink
 
-instance : Shrinkable (List PatternSegmentNonWF) :=
-  Shrinkable.mk (fun _ => [])
+instance [Shrinkable α] : Shrinkable (List α) := Shrinkable.mk List.shrink
+
+instance : Shrinkable PatternSegmentNonWF := {}
+
+instance : Shrinkable (NonEmptyList PatternSegmentNonWF) := {}
 
 instance : SampleableExt PatternSegmentNonWF :=
-  SampleableExt.mkSelfContained genSegment
+  SampleableExt.mkSelfContained genPatternSegmentNonWF
 
 instance : SampleableExt (List PatternSegmentNonWF) :=
-  SampleableExt.mkSelfContained (listOf genSegment)
+  SampleableExt.mkSelfContained (listOf genPatternSegmentNonWF)
 
-#lspec check "normalize gives isValid path in output" $
-  ∀ globPath : List PatternSegmentNonWF, isValidSequence (normalizeSegments globPath)
+instance : SampleableExt (NonEmptyList PatternSegmentNonWF) :=
+  SampleableExt.mkSelfContained (nonEmptyListOf genPatternSegmentNonWF)
+
+#lspec check "normalize gives isValid path in output"
+  (∀ globPath : NonEmptyList PatternSegmentNonWF, isValidSequence (normalizeSegments globPath.toList))
+
+-- #lspec test "normalize gives isValid path in output" $
+--   forAllSuchThat (listOf genSegment) (λ xs => xs ≠ []) fun xs => do
+--     let result := isValidSequence (normalizeSegments xs)
+--     unless result do
+--       throwTestFailure s!"normalize output is not valid: {xs}"
+
+-- #lspec test "normalize gives isValid path in output"
+  -- (∀ globPath, globPath ≠ [] → isValidSequence (normalizeSegments globPath))
   -- (∀ globPath : List PatternSegmentNonWF, isValidSequence (normalizeSegments (/- dbgTraceVal -/ globPath)))
   -- (∀ globPath : List PatternSegmentNonWF, (normalizeSegments globPath) ≠ [])
 

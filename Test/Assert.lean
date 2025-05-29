@@ -1,4 +1,3 @@
-import Glob
 import Init.System.IO
 import Lean.Data.RBTree
 import Lean

@@ -11,12 +11,12 @@ import Lean
 A non-empty string type for better type safety
 -/
 structure NonEmptyString where
-  val : String
-  property : val ≠ "" -- This is the proof that `val` is not empty
+  toString : String
+  property : toString ≠ ""
   deriving BEq, Hashable, Ord, Repr, DecidableEq
 
 instance : ToString NonEmptyString where
-  toString s := s.val
+  toString s := s.toString
 
 instance : Inhabited NonEmptyString where
   default := ⟨"default", by simp⟩
@@ -31,7 +31,7 @@ private def mkDecidableProof (prop : Expr) (inst : Expr) : Expr :=
 instance : ToExpr NonEmptyString where
   toTypeExpr := mkConst ``NonEmptyString
   toExpr nes :=
-    let sVal := nes.val
+    let sVal := nes.toString
     let sExpr := toExpr sVal      -- `Expr` for the string literal, e.g., `"world"`
     let emptyStrExpr := toExpr "" -- `Expr` for `""`
 
@@ -60,8 +60,6 @@ instance : ToExpr NonEmptyString where
 
 namespace NonEmptyString
 
-@[inline] def toString (x : NonEmptyString) := x.val
-
 @[inline] def fromString? (s : String) : Option NonEmptyString := if h : s ≠ "" then some ⟨s, h⟩ else none
 
 @[inline] def fromString! (s : String) : NonEmptyString :=
@@ -69,12 +67,24 @@ namespace NonEmptyString
   | some nes => nes
   | none => panic! "Expected non-empty string, got: '{s}'"
 
-@[inline] def mkNes (s : String) (h : s ≠ "") : NonEmptyString := ⟨s, h⟩
+@[inline] def fromNELChar (cs : List Char) (h : cs ≠ []) : NonEmptyString :=
+  ⟨⟨cs⟩, by
+    intro contra
+    apply h
+    rw [String.ext_iff] at contra
+    exact contra⟩
+
+@[inline] def fromLChar? (cs : List Char) : Option NonEmptyString := fromString? (String.mk cs)
+
+@[inline] def fromLChar! (cs : List Char) : NonEmptyString :=
+  match NonEmptyString.fromLChar? cs with
+  | some nes => nes
+  | none => panic! "Expected non-empty string, got: '{cs}'"
 
 end NonEmptyString
 
 instance : ToString NonEmptyString where
-  toString  := NonEmptyString.toString
+  toString := NonEmptyString.toString
 
 open Lean Macro
 
@@ -88,10 +98,8 @@ macro "nes!" s:str : term => do
 elab "nes_elab!" s:str : term => do
   let strVal := s.getString
   match NonEmptyString.fromString? strVal with
-  | some nesVal =>
-    return (toExpr nesVal)
-  | none =>
-    throwErrorAt s "String literal cannot be empty for nes!"
+  | some nesVal => return (toExpr nesVal)
+  | none => throwErrorAt s "String literal cannot be empty for nes!"
 
 example := nes!"world"
 example := nes_elab!"world"
