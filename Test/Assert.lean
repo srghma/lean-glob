@@ -58,5 +58,5 @@ def assertThrows (name : String) (ioAction : IO Unit) : IO Unit := do
     IO.println s!"❌ {name} failed: Expected an error, but no error was thrown."
     throw <| IO.Error.userError s!"Assertion failed: {name}"
 
--- def assertGlob (pattern : Pattern) (expected : ?a) : IO Unit :=
---   assertEq (Pattern.toString pattern) expected (← glob (← IO.Process.setCurrentDir) pattern)
+/- def assertGlob (pattern : Pattern) (expected : ?a) : IO Unit := -/
+/-   assertEq (Pattern.toString pattern) expected (← glob (← IO.Process.setCurrentDir) pattern) -/

@@ -1,16 +1,14 @@
 import Glob
+import Init.Data.Repr
 import Init.System.IO
-import Lean.Data.RBTree
+import LSpec
 import Lean
 import Lean.Data.RBMap
-import Std.Data.HashSet
 import Lean.Data.RBTree
-import Init.System.IO
 import Lean.Elab.Term
 import Lean.Parser.Term
-import Init.Data.Repr
+import Std.Data.HashSet
 import Test.NormalizeReturnsIsValidSpec
-import LSpec
 
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)

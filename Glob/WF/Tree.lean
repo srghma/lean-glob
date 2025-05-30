@@ -1,6 +1,8 @@
 import Glob.WF.Elab
 import Glob.Data.Tree
 import Aesop
+import Lean.Elab.Command
+
 open Tree
 
 /--
@@ -9,85 +11,126 @@ Match a single pattern segment against a tree dir name.
 - `oneStar` matches any single name.
 - `doubleStar` is handled at pattern list level, not here.
 -/
-def PatternSegmentNonWF.match (seg : PatternSegmentNonWF) (name : String) : Bool :=
+def PatternSegmentNonWF.matchNES (seg : PatternSegmentNonWF) (name : NonEmptyString) : Bool :=
+  match seg with
+  | .lit s => s == name
+  | .oneStar => true
+  | .doubleStar => false
+
+def PatternSegmentNonWF.matchS (seg : PatternSegmentNonWF) (name : String) : Bool :=
   match NonEmptyString.fromString? name with
   | none => false
-  | some nes =>
-    match seg with
-    | .lit s => s == nes
-    | .oneStar => true
-    | .doubleStar => false
+  | some name' => PatternSegmentNonWF.matchNES seg name'
 
 mutual
-  def matchAux : List PatternSegmentNonWF → Tree → Option Tree
+  def globList : List PatternSegmentNonWF → Tree → Option Tree
     | [], t => some (match t with
         | .file n => file n
         | .dir n _ => dir n [])
     | .doubleStar :: ps, t =>
       -- If no more patterns after **, return the full subtree
-      (if ps = [] then some t else matchAux ps t) <|>
+      (if ps = [] then some t else globList ps t) <|>
         match t with
         | .file _ => none
         | .dir name children =>
-          match matchList (.doubleStar :: ps) children with
+          match globListListTree (.doubleStar :: ps) children with
           | some cs => some (dir name cs)
           | none => none
     | seg :: ps, .file name =>
-      if ps = [] ∧ seg.match name then
+      if ps = [] ∧ seg.matchS name then
         some (file name)
       else
         none
     | seg :: ps, .dir name children =>
-      if seg.match name then
+      if seg.matchS name then
         if ps = [] then
           some (dir name [])
         else
-          match matchList ps children with
+          match globListListTree ps children with
           | some cs => some (dir name cs)
           | none => none
       else
         none
 
-  def matchList : List PatternSegmentNonWF → List Tree → Option (List Tree)
+  def globListListTree : List PatternSegmentNonWF → List Tree → Option (List Tree)
     | _, [] => none
     | ps, t :: ts =>
-      match matchAux ps t with
+      match globList ps t with
       | some t' =>
-        match matchList ps ts with
+        match globListListTree ps ts with
         | some ts' => some (t' :: ts')
         | none => some [t']
-      | none =>
-        matchList ps ts
+      | none => globListListTree ps ts
 end
 
-def glob : (NonEmptyList PatternSegmentNonWF) -> Tree -> Option Tree
-  | ⟨[], h⟩, t => by contradiction
-  | ⟨ps, h⟩, t => matchAux ps t
+class TreeGlobForPattern (α : Type) where
+  glob : α → Tree → Option Tree
+  globMany : NonEmptyList α → Tree → Option Tree
 
-def globMany (xss : NonEmptyList (NonEmptyList PatternSegmentNonWF)) (t : Tree) : Option Tree :=
-  xss.toList.filterMap (fun ps => glob ps t) |> NonEmptyList.fromList? |>.map Tree.mergeAll1
+private def globManyList (xss : NonEmptyList (List PatternSegmentNonWF)) (t : Tree) : Option Tree :=
+  xss.toList.filterMap (globList · t)
+  |> NonEmptyList.fromList?
+  |>.map Tree.mergeAll1
 
-#guard glob (patternNonWFStrict "Glob") (tree! "Glob" { "A" { } }) = some (tree! "Glob" {})
-#guard glob (patternNonWFStrict "Glob/*") (tree! "Glob" { "A" { }, "B" { } }) = some (tree! "Glob" { "A" {}, "B" {} })
-#guard glob (patternNonWFStrict "Glob/A") (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
-#guard glob (patternNonWFStrict "Glob/A") (tree! "Glob" { "A" }) = some (tree! "Glob" { "A" })
-#guard glob (patternNonWFStrict "Glob/B") (tree! "Glob" { "A" { } }) = none
+instance : TreeGlobForPattern (List PatternSegmentNonWF) where
+  glob := globList
+  globMany := globManyList
+
+private def globNEL (ps : NonEmptyList PatternSegmentNonWF) (t : Tree) : Option Tree :=
+  match ps with
+  | ⟨[], _⟩ => by contradiction
+  | ⟨ps, h⟩ => globList ps t
+
+private def globManyNEL (xss : NonEmptyList (NonEmptyList PatternSegmentNonWF)) (t : Tree) : Option Tree :=
+  xss.toList.filterMap (globNEL · t)
+  |> NonEmptyList.fromList?
+  |>.map Tree.mergeAll1
+
+instance : TreeGlobForPattern (NonEmptyList PatternSegmentNonWF) where
+  glob := globNEL
+  globMany := globManyNEL
+
+private def globValidated (pv : PatternValidated) (t : Tree) : Option Tree :=
+  NonEmptyList.fromList? pv.pattern >>= (globNEL · t)
+
+private def globManyValidated (pvs : NonEmptyList PatternValidated) (t : Tree) : Option Tree :=
+  pvs.toList.filterMap (globValidated · t)
+  |> NonEmptyList.fromList?
+  |>.map Tree.mergeAll1
+
+instance : TreeGlobForPattern PatternValidated where
+  glob := globValidated
+  globMany := globManyValidated
+
+open TreeGlobForPattern
+
+open Lean Elab Command Meta
+
+syntax "#testGlob" str term:arg " = " term : command
+macro_rules
+| `(#testGlob $a $b = $c) => do
+  `(#guard glob (patternStrict $a) $b = $c
+    #guard glob (patternNonWFStrict $a) $b = $c)
+
+#testGlob "Glob" (tree! "Glob" { "A" { } }) = some (tree! "Glob" {})
+#testGlob "Glob/A" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
+#testGlob "Glob/A" (tree! "Glob" { "A" }) = some (tree! "Glob" { "A" })
+#testGlob "Glob/B" (tree! "Glob" { "A" { } }) = none
 
 def globTestExample1 := tree! "Glob" { "A" { "X" { } }, "B" { "Y" { } } }
 
-#guard glob (patternNonWFStrict "**") globTestExample1 = some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } })
-#guard glob (patternNonWFStrict "**/X") globTestExample1 = some (tree! "Glob" { "A" { "X" {} } })
-#guard glob (patternNonWFStrict "**/Y") globTestExample1 = some (tree! "Glob" { "B" { "Y" {} } })
-#guard glob (patternNonWFStrict "**/Z") globTestExample1 = none
-#guard glob (patternNonWFStrict "Glob/*") globTestExample1 = some (tree! "Glob" { "A" {}, "B" {} })
-#guard glob (patternNonWFStrict "Glob/**") globTestExample1 = some globTestExample1
-#guard glob (patternNonWFStrict "Glob/**") globTestExample1 = some globTestExample1
-#guard glob (patternNonWFStrict "Glob/A/*") globTestExample1 = some (tree! "Glob" { "A" { "X" {} } })
-#guard glob (patternNonWFStrict "Glob/A/**") globTestExample1 = some (tree! "Glob" { "A" { "X" { } } })
-#guard glob (patternNonWFStrict "Glob/A/X") globTestExample1 = some (tree! "Glob" { "A" { "X" {} } })
-#guard glob (patternNonWFStrict "Glob/B/**") globTestExample1 = some (tree! "Glob" { "B" { "Y" {} } })
-#guard glob (patternNonWFStrict "Glob/C") globTestExample1 = none
-
+#testGlob "**" globTestExample1 = some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } })
+#testGlob "**/X" globTestExample1 = some (tree! "Glob" { "A" { "X" {} } })
+#testGlob "**/Y" globTestExample1 = some (tree! "Glob" { "B" { "Y" {} } })
+#testGlob "**/Z" globTestExample1 = none
+#testGlob "Glob/*" globTestExample1 = some (tree! "Glob" { "A" {}, "B" {} })
+#testGlob "Glob/**" globTestExample1 = some globTestExample1
+#testGlob "Glob/**" globTestExample1 = some globTestExample1
+#testGlob "Glob/A/*" globTestExample1 = some (tree! "Glob" { "A" { "X" {} } })
+#testGlob "Glob/A/**" globTestExample1 = some (tree! "Glob" { "A" { "X" { } } })
+#testGlob "Glob/A/X" globTestExample1 = some (tree! "Glob" { "A" { "X" {} } })
+#testGlob "Glob/B/**" globTestExample1 = some (tree! "Glob" { "B" { "Y" {} } })
+#testGlob "Glob/C" globTestExample1 = none
 
 def globTestExample2 := tree! "Root" {
   "foo" { "file.txt", "bar" { "baz.txt" , "qux.md" } },
@@ -96,46 +139,46 @@ def globTestExample2 := tree! "Root" {
   "zeta" {}
 }
 
-#guard glob (patternNonWFStrict "*") (tree! "foo" {}) = some (tree! "foo" {})
-#guard glob (patternNonWFStrict "**") (tree! "root" {}) = some (tree! "root" {})
-#guard glob (patternNonWFStrict "**/baz.txt") globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
-#guard glob (patternNonWFStrict "**/delta.txt") globTestExample2 = some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } })
-#guard glob (patternNonWFStrict "**/file.txt") globTestExample2 = some (tree! "Root" { "foo" { "file.txt"  } })
-#guard glob (patternNonWFStrict "**/qux.md") globTestExample2 = some (tree! "Root" { "foo" { "bar" { "qux.md" } } })
-#guard glob (patternNonWFStrict "Root") globTestExample2 = some (tree! "Root" {})
-#guard glob (patternNonWFStrict "Root/*") globTestExample2 = some (Tree.dir "Root" [Tree.dir "foo" [], Tree.dir "foo2" [], Tree.dir "alpha" [], Tree.dir "zeta" []])
-#guard glob (patternNonWFStrict "Root/**") globTestExample2 = some globTestExample2
-#guard glob (patternNonWFStrict "Root/**/bar/*") globTestExample2 = (some (tree! "Root" { "foo" { "bar" { "baz.txt", "qux.md" } }, "foo2" { "bar" { "baz2.txt", "qux2.md" } } }))
-#guard glob (patternNonWFStrict "Root/**/delta.txt") globTestExample2 = some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } })
-#guard glob (patternNonWFStrict "Root/**/file.txt") globTestExample2 = some (tree! "Root" { "foo" { "file.txt"  } })
-#guard glob (patternNonWFStrict "Root/*/*/*/delta.txt") globTestExample2 = some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } })
-#guard glob (patternNonWFStrict "Root/foo/**/baz.txt") globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
-#guard glob (patternNonWFStrict "Root/foo/*/baz.txt") globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
-#guard glob (patternNonWFStrict "Root/foo/*/doesntexist.txt") globTestExample2 = none
-#guard glob (patternNonWFStrict "Root/foo/bar/baz.txt") globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
-#guard glob (patternNonWFStrict "Root/foo/bar/baz.txt/extra") globTestExample2 = none
-#guard glob (patternNonWFStrict "Root/foo/bar/notfound.txt") globTestExample2 = none
+#testGlob "*" (tree! "foo" {}) = some (tree! "foo" {})
+#testGlob "**" (tree! "root" {}) = some (tree! "root" {})
+#testGlob "**/baz.txt" globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
+#testGlob "**/delta.txt" globTestExample2 = some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } })
+#testGlob "**/file.txt" globTestExample2 = some (tree! "Root" { "foo" { "file.txt"  } })
+#testGlob "**/qux.md" globTestExample2 = some (tree! "Root" { "foo" { "bar" { "qux.md" } } })
+#testGlob "Root" globTestExample2 = some (tree! "Root" {})
+#testGlob "Root/*" globTestExample2 = some (Tree.dir "Root" [Tree.dir "foo" [], Tree.dir "foo2" [], Tree.dir "alpha" [], Tree.dir "zeta" []])
+#testGlob "Root/**" globTestExample2 = some globTestExample2
+#testGlob "Root/**/bar/*" globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt", "qux.md" } }, "foo2" { "bar" { "baz2.txt", "qux2.md" } } })
+#testGlob "Root/**/delta.txt" globTestExample2 = some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } })
+#testGlob "Root/**/file.txt" globTestExample2 = some (tree! "Root" { "foo" { "file.txt"  } })
+#testGlob "Root/*/*/*/delta.txt" globTestExample2 = some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } })
+#testGlob "Root/foo/**/baz.txt" globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
+#testGlob "Root/foo/*/baz.txt" globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
+#testGlob "Root/foo/*/doesntexist.txt" globTestExample2 = none
+#testGlob "Root/foo/bar/baz.txt" globTestExample2 = some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } })
+#testGlob "Root/foo/bar/baz.txt/extra" globTestExample2 = none
+#testGlob "Root/foo/bar/notfound.txt" globTestExample2 = none
 
+#guard globMany (nel![patternStrict "Glob/A", patternStrict "Glob/B"]) (tree! "Glob" { "A" {}, "B" {} }) = some (tree! "Glob" { "A" {}, "B" {} })
+#guard globMany (nel![patternStrict "Glob/A", patternStrict "Glob/B"]) (tree! "Glob" { "A" {}, "B" {} }) = some (tree! "Glob" { "A" {}, "B" {} })
 
-#guard globMany (nel![patternNonWFStrict "Glob/A", patternNonWFStrict "Glob/B"]) (tree! "Glob" { "A" {}, "B" {} }) = some (tree! "Glob" { "A" {}, "B" {} })
-
-#guard globMany (nel![patternNonWFStrict "Glob/A", patternNonWFStrict "Glob/C"]) (tree! "Glob" { "A" {}, "B" {} })
+#guard globMany (nel![patternStrict "Glob/A", patternStrict "Glob/C"]) (tree! "Glob" { "A" {}, "B" {} })
   = some (tree! "Glob" { "A" {} })
 
-#guard globMany (nel![patternNonWFStrict "**/X", patternNonWFStrict "**/Y"]) globTestExample1
+#guard globMany (nel![patternStrict "**/X", patternStrict "**/Y"]) globTestExample1
   = some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } })
 
-#guard globMany (nel![patternNonWFStrict "**/baz.txt", patternNonWFStrict "**/delta.txt"]) globTestExample2
+#guard globMany (nel![patternStrict "**/baz.txt", patternStrict "**/delta.txt"]) globTestExample2
   = some (tree! "Root" {
     "foo"   { "bar" { "baz.txt" } },
     "alpha" { "beta" { "gamma" { "delta.txt" } } }
   })
 
-#guard globMany (nel![patternNonWFStrict "**/file.txt", patternNonWFStrict "**/qux.md"]) globTestExample2 = some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } })
+#guard globMany (nel![patternStrict "**/file.txt", patternStrict "**/qux.md"]) globTestExample2 = some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } })
 
-#guard globMany (nel![patternNonWFStrict "**/doesntexist.txt", patternNonWFStrict "**/missing.txt"]) globTestExample2 = none
+#guard globMany (nel![patternStrict "**/doesntexist.txt", patternStrict "**/missing.txt"]) globTestExample2 = none
 
-#guard globMany (nel![patternNonWFStrict "Root/foo/bar/baz.txt", patternNonWFStrict "Root/foo2/bar/qux2.md"]) globTestExample2
+#guard globMany (nel![patternStrict "Root/foo/bar/baz.txt", patternStrict "Root/foo2/bar/qux2.md"]) globTestExample2
   = some (tree! "Root" {
     "foo"  { "bar" { "baz.txt" } },
     "foo2" { "bar" { "qux2.md" } }

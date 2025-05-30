@@ -19,7 +19,7 @@ instance : ToString NonEmptyString where
   toString s := s.toString
 
 instance : Inhabited NonEmptyString where
-  default := ⟨"default", by simp⟩
+  default := ⟨"DEFAULT", by simp⟩
 
 open Lean Meta Elab
 
