@@ -21,7 +21,7 @@ def Tree.toString : Tree → String
 def Tree.toStringMacro (t : Tree) : String := "tree! " ++ Tree.toString t
 
 open Std.Format in
-partial def Tree.toFormat : Tree → Format
+def Tree.toFormat : Tree → Format
 | Tree.file name =>
   -- Just the filename in quotes, e.g. `"foo"`
   text "\"" ++ text name ++ text "\""
@@ -38,7 +38,6 @@ partial def Tree.toFormat : Tree → Format
         ) ++
         line
   group (
-    text "tree! " ++
     text "\"" ++ text name ++ text "\"" ++
     text " {" ++
     childrenFmt ++

@@ -8,6 +8,8 @@ import Test.LSpec.NonEmptyString
 import Test.LSpec.PatternSegmentNonWF
 open LSpec SlimCheck Gen
 
+namespace NormalizeReturnsIsValidSpec
+
 instance : Shrinkable PatternSegmentNonWF := Shrinkable.mk PatternSegmentNonWF.shrink
 
 instance [Shrinkable a] : Shrinkable (NonEmptyList a) := Shrinkable.mk NonEmptyList.shrink
@@ -60,3 +62,5 @@ def suite := [
 --     isValidSequence (normalizeSegments globPath)
 
 -- #lspec check "normalize gives isValid path in output" $ ∀ globPath : List PatternSegmentNonWF, isValidSequence (normalizeSegments globPath)
+
+end NormalizeReturnsIsValidSpec

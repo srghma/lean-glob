@@ -24,9 +24,6 @@ instance [ToString α] : ToString (NonEmptyList α) where
 instance [Inhabited α] : Inhabited (NonEmptyList α) where
   default := ⟨[default], List.cons_ne_nil default []⟩
 
--- ToExpr instance for compile-time evaluation
-open Lean Elab Term Meta
-
 namespace NonEmptyList
 
 @[inline] def fromList? (l : List α) : Option (NonEmptyList α) :=
@@ -68,7 +65,13 @@ namespace NonEmptyList
   let allInits := nel.toList.inits.drop 1  -- drop the initial empty list
   fromList! (allInits.map fromList!)
 
+@[inline] def mapM {α : Type u} /- {β : Type v} {m : Type v → Type w} -/ [Monad m] [Inhabited β] (f : α → m β) (as : NonEmptyList α) : m (NonEmptyList β) := do
+  let bs ← as.toList.mapM f
+  pure (NonEmptyList.fromList! bs)
+
 end NonEmptyList
+
+section
 
 open Lean Macro Parser Term Elab Term
 
@@ -104,6 +107,8 @@ example : NonEmptyList Nat := nel![10]
 #guard (nel![1, 2, 3]).head = 1 -- Should output 1
 #guard (nel![1, 2, 3]).tail = [2, 3] -- Should output [2, 3]
 #guard (nel![1, 2, 3]).length = 3 -- Should output 3
+
+end
 
 -- #eval (toExpr $ nel![1]) -- Should output 1
 

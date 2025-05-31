@@ -1,126 +1,278 @@
---   runTests #[
---     ("FindRecursive", fun (currentTmpDir : FilePath) => do -- TODO: this is a limitation of glob-posix, no support of recursion
---       writeFile "foo.txt" "content"
---       createDir "subdir"
---       writeFile "subdir/bar.txt" "content"
---       writeFile "subdir/foo.txt" "content"
---       createDir "subdir/another_subdir"
---       writeFile "subdir/another_subdir/bar.txt" "content"
---       writeFile "subdir/another_subdir/foo.txt" "content"
---       assertGlob nel![PatternSegment.doubleStar, nes!"foo.txt"] #["foo.txt", "subdir/foo.txt", "subdir/another_subdir/foo.txt"]
---       assertGlob nel![nes!"foo.txt"]] #["foo.txt"]
---       assertGlob nel![PatternSegment.oneStar, nes!"foo.txt"] #["subdir/foo.txt"]
---     ]
---     -- ("BasicWildcard", fun (_tmpDir : FilePath) => do
---     --   writeFile "file1.txt" "content"
---     --   writeFile "file2.txt" "content"
---     --   writeFile "image.png" "content"
---     --   createDir "subdir"
---     --   writeFile "subdir/file3.txt" "content"
---     --   createDir "empty_dir"
---
---     --   let results ← glob "*.txt"
---     --   assertEq "Basic wildcard *.txt" #["file1.txt", "file2.txt"] results
---
---     --   let allFiles ← glob "*"
---     --   assertEq "All files *" #["file1.txt", "file2.txt", "image.png", "empty_dir", "subdir"] allFiles),
---     -- ("QuestionMark", fun (_tmpDir : FilePath) => do
---     --   writeFile "doc1" "content"
---     --   writeFile "doc2" "content"
---     --   writeFile "doc_long" "content"
---
---     --   let results ← glob "doc?"
---     --   assertEq "Question mark doc?" #["doc1", "doc2"] results),
---     -- ("CharacterClass", fun (_tmpDir : FilePath) => do
---     --   writeFile "apple" "content"
---     --   writeFile "apricot" "content"
---     --   writeFile "banana" "content"
---     --   assertEq "Character class a[p-r]*" #["apple", "apricot"] (← glob "a[p-r]*")),
---     -- ("GlobWithDirMark", fun (_tmpDir : FilePath) => do
---     --   writeFile "file.txt" "content"
---     --   createDir "mydir"
---     --   createDir "another_dir"
---     --   let expected := #["file.txt", "mydir/", "another_dir/"]
---     --   assertEq "globWithDirMark *" expected (← globWithDirMark "*")),
---     -- ("GlobUnsorted", fun (_tmpDir : FilePath) => do
---     --   writeFile "c.txt" "c"
---     --   writeFile "a.txt" "a"
---     --   writeFile "b.txt" "b"
---     --   -- We can't assert a specific order, just that all are present and count is correct
---     --   assertEq "globUnsorted *.txt" #["a.txt", "b.txt", "c.txt"] (← globUnsorted "*.txt")),
---     -- ("CheckPattern", fun (_tmpDir : FilePath) => do
---     --   writeFile "existing.txt" "content"
---     --   writeFile "another.md" "content"
---     --   assertBool "checkPattern *.txt (true)" true (← checkPattern "*.txt")
---     --   assertBool "checkPattern *.xyz (false)" false (← checkPattern "*.xyz")
---     --   assertBool "checkPattern existing.txt (true)" true (← checkPattern "existing.txt")
---     --   assertBool "checkPattern non_existing.txt (false)" false (← checkPattern "non_existing.txt")),
---     -- ("GlobMany", fun (_tmpDir : FilePath) => do
---     --   writeFile "file.txt" "content"
---     --   writeFile "doc.md" "content"
---     --   writeFile "image.jpg" "content"
---     --   writeFile "data.csv" "content"
---     --   assertEq "globMany multiple extensions" #["file.txt", "doc.md", "data.csv"] (← globMany #["*.txt", "*.md", "*.csv"])
---     --   assertEq "globMany mixed (some match, some no match)" #["file.txt"] (← globMany #["*.xyz", "*.txt"])
---     --   assertIsEmpty "globMany all no match" (← globMany #["*.xyz", "*.abc"])),
---     -- ("GlobWithBraces", fun (_tmpDir : FilePath) => do
---     --   writeFile "config.json" "content"
---     --   writeFile "config.yaml" "content"
---     --   writeFile "config.txt" "content"
---     --   writeFile "data.json" "content"
---     --   assertEq "globWithBraces config.{json,yaml}" #["config.json", "config.yaml"] (← globWithBraces "config.{json,yaml}")),
---     -- ("GlobWithTilde", fun (_tmpDir : FilePath) => do
---     --   -- Tilde expansion is highly environment-dependent. This test primarily checks
---     --   -- that the flag is passed and doesn't cause a crash. A true functional test
---     --   -- would require setting up a controlled home directory, which is non-trivial.
---     --   let homeDirFile := "~/.profile"
---     --   let results ← globWithTilde homeDirFile
---     --   if results.isEmpty then
---     --     IO.println s!"Warning: {homeDirFile} not found or tilde expansion failed. (This might be normal depending on environment/config)"
---     --     pure ()
---     --   else
---     --     assertIsNotEmpty "globWithTilde ~/" results
---     --     IO.println s!"Found {results.size} files with tilde expansion, e.g., {results[0]!}"),
---     -- ("GlobDirsOnly", fun (tmpDir : FilePath) => do
---     --   writeFile "file.txt" "content"
---     --   createDir "dir1"
---     --   createDir "dir2"
---     --   writeFile (tmpDir / "dir1" / "nested_file.txt") "content"
---     --   assertEq "globDirsOnly *" #["dir1/", "dir2/"] (← globDirsOnly "*")),
---     -- ("GlobSafe", fun (_tmpDir : FilePath) => do
---     --   writeFile "present.txt" "content"
---     --   assertEq "globSafe (match)" #["present.txt"] (← globSafe "*.txt")
---     --   assertEq "globSafe (no match, nocheck)" #["nonexistent.*"] (← globSafe "nonexistent.*")
---     --   assertEq "globSafe (literal no match, nocheck)" #["definitely_not_here.md"] (← globSafe "definitely_not_here.md")),
---     -- ("FindByExtension", fun (_tmpDir : FilePath) => do
---     --   writeFile "a.lean" "content"
---     --   writeFile "b.md" "content"
---     --   writeFile "c.lean" "content"
---     --   assertEq "findByExtension lean" #["a.lean", "c.lean"] (← findByExtension "lean")
---     --   assertIsEmpty "findByExtension xyz (empty)" (← findByExtension "xyz")),
---     -- ("FindByExtensions", fun (_tmpDir : FilePath) => do
---     --   writeFile "a.lean" "content"
---     --   writeFile "b.md" "content"
---     --   writeFile "c.txt" "content"
---     --   writeFile "d.json" "content"
---     --   assertEq "findByExtensions lean, txt" #["a.lean", "c.txt"] (← findByExtensions #["lean", "txt"])
---     --   assertIsEmpty "findByExtensions xyz, abc (empty)" (← findByExtensions #["xyz", "abc"])),
---     -- ("FindDirectories", fun (tmpDir : FilePath) => do
---     --   writeFile "file.txt" "content"
---     --   createDir "dir1"
---     --   createDir "dir2"
---     --   writeFile (tmpDir / "dir1" / "nested.txt") "content"
---     --   assertEq "findDirectories" #["dir1/", "dir2/"] (← findDirectories)),
---     -- ("NoMatchesWithoutNoCheck", fun (_tmpDir : FilePath) => do
---     --   assertIsEmpty "No matches without nocheck" (← glob "*.nonexistent")),
---     -- ("TestErrFlag", fun (tmpDir : FilePath) => do
---     --   -- This test remains limited due to portability of permissions.
---     --   -- It primarily ensures the flag passes and doesn't crash the FFI.
---     --   let restrictedDir := tmpDir / "restricted"
---     --   createDir restrictedDir
---     --   -- One *could* attempt `IO.Process.runCommand` for `chmod` but it's not portable
---     --   -- across OSes or always reliable for testing specific error conditions.
---     --   let results ← glob (restrictedDir / "*").toString { GlobFlags.default with err := true }
---     --   IO.println s!"TestErrFlag: Results: {results}"
---     -- )
---     /- ] -/
+import Glob
+import Glob.Data.Tree
+import Glob.WF.IO
+import Glob.WF.Tree
+import Init.Data.Repr
+import Init.System.IO
+import LSpec
+import Lean
+import Lean.Data.RBMap
+import Lean.Data.RBTree
+import Lean.Elab.Term
+import Lean.Parser.Term
+import Std.Data.HashSet
+import Test.NormalizeReturnsIsValidSpec
+open IO.FS
+open IO.FS (DirEntry FileType Metadata)
+open System (FilePath)
+
+namespace GlobSpec
+
+-- Updated function signatures to match the actual glob functions
+def glob (pattern : PatternValidated) (tree : Tree) : Option Tree := none
+def globMany (patterns : NonEmptyList PatternValidated) (tree : Tree) : Option Tree := none
+
+-- Helper to assert glob results match expected Tree
+def assertGlobResult (name : String) (pattern : String) (tree : Tree) (expected : Option Tree) : IO Unit := do
+  let patternValidated ← PatternValidated.patternStrictIO! pattern
+  let actual := glob patternValidated tree
+  unless actual == expected do
+    IO.println s!"❌ {name} failed:"
+    IO.println s!"  Pattern: {pattern}"
+    IO.println s!"  Expected: {reprStr expected}"
+    IO.println s!"  Actual: {reprStr actual}"
+    throw <| IO.Error.userError s!"Assertion failed: {name}"
+
+-- Helper to assert globMany results match expected Tree
+def assertGlobManyResult (name : String) (patternsNel : NonEmptyList String) (tree : Tree) (expected : Option Tree) : IO Unit := do
+  let patternsNel' ← patternsNel.mapM PatternValidated.patternStrictIO!
+  let actual := globMany patternsNel' tree
+  unless actual == expected do
+    IO.println s!"❌ {name} failed:"
+    IO.println s!"  Patterns: {patternsNel}"
+    IO.println s!"  Expected: {reprStr expected}"
+    IO.println s!"  Actual: {reprStr actual}"
+    throw <| IO.Error.userError s!"Assertion failed: {name}"
+
+-- Test data
+def globTestExample1 := tree! "Glob" { "A" { "X" { } }, "B" { "Y" { } } }
+
+def globTestExample2 := tree! "Root" {
+  "foo" { "file.txt", "bar" { "baz.txt" , "qux.md" } },
+  "foo2" { "file2.txt", "bar" { "baz2.txt", "qux2.md" }  },
+  "alpha" { "beta" { "gamma" { "delta.txt"  } } },
+  "zeta" {}
+}
+
+-- Basic glob tests
+def testBasicGlob : IO Unit := do
+  IO.println "Testing basic glob patterns..."
+
+  assertGlobResult "Glob root match" "Glob"
+    (tree! "Glob" { "A" { } })
+    (some (tree! "Glob" {}))
+
+  assertGlobResult "Glob/A match" "Glob/A"
+    (tree! "Glob" { "A" { } })
+    (some (tree! "Glob" { "A" { } }))
+
+  assertGlobResult "Glob/A match without children" "Glob/A"
+    (tree! "Glob" { "A" })
+    (some (tree! "Glob" { "A" }))
+
+  assertGlobResult "Glob/B no match" "Glob/B"
+    (tree! "Glob" { "A" { } })
+    none
+
+-- Wildcard tests
+def testWildcardGlob : IO Unit := do
+  IO.println "Testing wildcard patterns..."
+
+  assertGlobResult "Double star match" "**"
+    globTestExample1
+    (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
+
+  assertGlobResult "**/X recursive match" "**/X"
+    globTestExample1
+    (some (tree! "Glob" { "A" { "X" {} } }))
+
+  assertGlobResult "**/Y recursive match" "**/Y"
+    globTestExample1
+    (some (tree! "Glob" { "B" { "Y" {} } }))
+
+  assertGlobResult "**/Z no match" "**/Z"
+    globTestExample1
+    none
+
+  assertGlobResult "Glob/* single level" "Glob/*"
+    globTestExample1
+    (some (tree! "Glob" { "A" {}, "B" {} }))
+
+  assertGlobResult "Glob/** recursive" "Glob/**"
+    globTestExample1
+    (some globTestExample1)
+
+-- Specific path tests
+def testSpecificPaths : IO Unit := do
+  IO.println "Testing specific path patterns..."
+
+  assertGlobResult "Glob/A/* match" "Glob/A/*"
+    globTestExample1
+    (some (tree! "Glob" { "A" { "X" {} } }))
+
+  assertGlobResult "Glob/A/** recursive" "Glob/A/**"
+    globTestExample1
+    (some (tree! "Glob" { "A" { "X" { } } }))
+
+  assertGlobResult "Glob/A/X exact match" "Glob/A/X"
+    globTestExample1
+    (some (tree! "Glob" { "A" { "X" {} } }))
+
+  assertGlobResult "Glob/B/** recursive" "Glob/B/**"
+    globTestExample1
+    (some (tree! "Glob" { "B" { "Y" {} } }))
+
+  assertGlobResult "Glob/C no match" "Glob/C"
+    globTestExample1
+    none
+
+-- Simple tree tests
+def testSimpleTrees : IO Unit := do
+  IO.println "Testing simple tree patterns..."
+
+  assertGlobResult "Single star match" "*"
+    (tree! "foo" {})
+    (some (tree! "foo" {}))
+
+  assertGlobResult "Double star on simple tree" "**"
+    (tree! "root" {})
+    (some (tree! "root" {}))
+
+-- Complex tree tests
+def testComplexTree : IO Unit := do
+  IO.println "Testing complex tree patterns..."
+
+  assertGlobResult "**/baz.txt deep search" "**/baz.txt"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
+
+  assertGlobResult "**/delta.txt deep search" "**/delta.txt"
+    globTestExample2
+    (some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } }))
+
+  assertGlobResult "**/file.txt search" "**/file.txt"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "file.txt"  } }))
+
+  assertGlobResult "**/qux.md search" "**/qux.md"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "bar" { "qux.md" } } }))
+
+  assertGlobResult "Root exact match" "Root"
+    globTestExample2
+    (some (tree! "Root" {}))
+
+  assertGlobResult "Root/* first level" "Root/*"
+    globTestExample2
+    (some (Tree.dir "Root" [Tree.dir "foo" [], Tree.dir "foo2" [], Tree.dir "alpha" [], Tree.dir "zeta" []]))
+
+  assertGlobResult "Root/** full tree" "Root/**"
+    globTestExample2
+    (some globTestExample2)
+
+-- Multi-level pattern tests
+def testMultiLevelPatterns : IO Unit := do
+  IO.println "Testing multi-level patterns..."
+
+  assertGlobResult "Root/**/bar/* nested wildcard" "Root/**/bar/*"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "bar" { "baz.txt", "qux.md" } }, "foo2" { "bar" { "baz2.txt", "qux2.md" } } }))
+
+  assertGlobResult "Root/**/delta.txt deep nested" "Root/**/delta.txt"
+    globTestExample2
+    (some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } }))
+
+  assertGlobResult "Root/**/file.txt nested search" "Root/**/file.txt"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "file.txt"  } }))
+
+  assertGlobResult "Root/*/*/*/delta.txt exact depth" "Root/*/*/*/delta.txt"
+    globTestExample2
+    (some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } }))
+
+-- Specific path combinations
+def testSpecificCombinations : IO Unit := do
+  IO.println "Testing specific path combinations..."
+
+  assertGlobResult "Root/foo/**/baz.txt" "Root/foo/**/baz.txt"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
+
+  assertGlobResult "Root/foo/*/baz.txt" "Root/foo/*/baz.txt"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
+
+  assertGlobResult "Root/foo/*/doesntexist.txt no match" "Root/foo/*/doesntexist.txt"
+    globTestExample2
+    none
+
+  assertGlobResult "Root/foo/bar/baz.txt exact" "Root/foo/bar/baz.txt"
+    globTestExample2
+    (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
+
+  assertGlobResult "Root/foo/bar/baz.txt/extra invalid" "Root/foo/bar/baz.txt/extra"
+    globTestExample2
+    none
+
+  assertGlobResult "Root/foo/bar/notfound.txt no match" "Root/foo/bar/notfound.txt"
+    globTestExample2
+    none
+
+-- GlobMany tests using assertGlobManyResult
+def testGlobMany : IO Unit := do
+  IO.println "Testing globMany patterns..."
+
+  assertGlobManyResult "GlobMany test 1" nel!["Glob/A", "Glob/B"]
+    (tree! "Glob" { "A" {}, "B" {} })
+    (some (tree! "Glob" { "A" {}, "B" {} }))
+
+  assertGlobManyResult "GlobMany test 2" nel!["Glob/A", "Glob/C"]
+    (tree! "Glob" { "A" {}, "B" {} })
+    (some (tree! "Glob" { "A" {} }))
+
+  assertGlobManyResult "GlobMany test 3" nel!["**/X", "**/Y"]
+    globTestExample1
+    (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
+
+  assertGlobManyResult "GlobMany test 4" nel!["**/baz.txt", "**/delta.txt"]
+    globTestExample2
+    (some (tree! "Root" {
+      "foo"   { "bar" { "baz.txt" } },
+      "alpha" { "beta" { "gamma" { "delta.txt" } } }
+    }))
+
+  assertGlobManyResult "GlobMany test 5" nel!["**/file.txt", "**/qux.md"]
+    globTestExample2
+    (some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } }))
+
+  assertGlobManyResult "GlobMany test 6" nel!["**/doesntexist.txt", "**/missing.txt"]
+    globTestExample2
+    none
+
+  assertGlobManyResult "GlobMany test 7" nel!["Root/foo/bar/baz.txt", "Root/foo2/bar/qux2.md"]
+    globTestExample2
+    (some (tree! "Root" {
+      "foo"  { "bar" { "baz.txt" } },
+      "foo2" { "bar" { "qux2.md" } }
+    }))
+
+-- Main test runner
+def runGlobTests : IO Unit := do
+  IO.println "🧪 Starting Glob Pattern Tests..."
+
+  try
+    testBasicGlob
+    testWildcardGlob
+    testSpecificPaths
+    testSimpleTrees
+    testComplexTree
+    testMultiLevelPatterns
+    testSpecificCombinations
+    testGlobMany
+
+    IO.println "✅ All glob pattern tests passed!"
+  catch e =>
+    IO.println s!"❌ Glob tests failed: {e}"
+    throw e
+
+end

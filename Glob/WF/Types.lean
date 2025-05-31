@@ -4,6 +4,7 @@ import Lean.Parser.Term
 import Glob.Data.NonEmptyString
 import Glob.Data.NonEmptyList
 import Glob.NonWF.Types
+import Glob.NonWF.Normalize
 
 --------------------------------------
 
@@ -47,6 +48,9 @@ structure PatternValidated : Type where
   pattern : List PatternSegmentNonWF
   valid_sequence : isValidSequence pattern
   deriving Repr, Ord, Hashable, DecidableEq
+
+instance : Inhabited PatternValidated where
+  default := ⟨[.oneStar], by simp [isValidSequence]⟩
 
 open Lean Meta Elab
 
@@ -115,3 +119,18 @@ def PatternValidated.mk? (segments : List PatternSegmentNonWF) : Except PatternV
 
 -- ✅ "**/foo/**/bar/**"
 #guard (PatternValidated.mk? [.doubleStar, nes!"foo", .doubleStar, nes!"bar", .doubleStar]).isOk
+
+-----------------------------
+
+def PatternValidated.patternStrict? (str : String) : Except String PatternValidated :=
+  match PatternNonWF'.fromStringStrict str with
+  | .none => throw "Did some segment was empty? `foo//bar` should be `foo/bar`"
+  | .some pat => match (PatternValidated.mk? pat) with
+    | .error .invalidEmpty => throw PatternValidatedError.invalidEmpty.toHumanReadable
+    | .error .invalidWrongOrdering => throw (s!"Probably You wanted to write {PatternNonWF'.toString $ normalizeSegments pat}\n{PatternValidatedError.invalidWrongOrdering.toHumanReadable}")
+    | .ok pat => return pat
+
+def PatternValidated.patternStrictIO! (str : String) : IO PatternValidated := do
+  match PatternValidated.patternStrict? str with
+  | .ok  pat => pure pat
+  | .error err => throw <| IO.userError err

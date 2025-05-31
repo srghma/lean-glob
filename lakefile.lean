@@ -36,7 +36,7 @@ lean_lib Glob {
 }
 
 lean_lib Test {
-  globs := #[`Test.Main].map Glob.andSubmodules -- doesnt do anything
+  globs := #[`Test].map Glob.andSubmodules -- doesn't do anything
 }
 
 lean_lib Pathy {
@@ -46,5 +46,6 @@ lean_lib Pathy {
 -- lake test
 @[test_driver]
 lean_exe test where
-  /- root := `Test.Main -/
+  root := `Test.Main
+  -- globs := #[`Test].map Glob.andSubmodules -- doesn't do anything
   -- supportInterpreter := true

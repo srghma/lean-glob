@@ -47,6 +47,23 @@ def PatternSegmentNonWF.fromNES (nes : NonEmptyString) : PatternSegmentNonWF :=
   | "*"  => .oneStar
   | _    => .lit nes
 
+/--
+Match a single pattern segment against a tree dir name.
+- `lit s` matches if `s = name`.
+- `oneStar` matches any single name.
+- `doubleStar` is handled at pattern list level, not here.
+-/
+def PatternSegmentNonWF.matchNES (seg : PatternSegmentNonWF) (name : NonEmptyString) : Bool :=
+  match seg with
+  | .lit s => s == name
+  | .oneStar => true
+  | .doubleStar => false
+
+def PatternSegmentNonWF.matchS (seg : PatternSegmentNonWF) (name : String) : Bool :=
+  match NonEmptyString.fromString? name with
+  | none => false
+  | some name' => PatternSegmentNonWF.matchNES seg name'
+
 open Lean Meta
 
 -- set_option diagnostics true
@@ -77,20 +94,16 @@ def PatternNonWF'.fromStringLax (s : String) : PatternNonWF' :=
   |> ToNE.FilterMap.«LS->LNES»
   |>.map PatternSegmentNonWF.fromNES
 
-def PatternNonWF.toString (ps : PatternNonWF) : String := PatternNonWF'.toString ps.toList
-def PatternNonWF.fromStringStrict (s : String) : Option PatternNonWF := PatternNonWF'.fromStringStrict s >>= NonEmptyList.fromList?
+def PatternNonWF.toString : PatternNonWF -> String := (PatternNonWF'.toString ·.toList)
+def PatternNonWF.fromStringStrict : String -> Option PatternNonWF := (PatternNonWF'.fromStringStrict · >>= NonEmptyList.fromList?)
 
-set_option diagnostics.threshold 50
-
-elab "patternNonWFLax" pat:str : term => do
-  let s := pat.getString
-  return (Lean.toExpr (PatternNonWF'.fromStringLax s))
+elab "patternNonWFLax" pat:str : term => return Lean.toExpr (PatternNonWF'.fromStringLax pat.getString)
 
 elab "patternNonWFStrict" pat:str : term => do
   let s := pat.getString
   match PatternNonWF.fromStringStrict s with
   | some (p : NonEmptyList PatternSegmentNonWF) => return (Lean.toExpr p)
-  | none   => throwError s!"invalid non-well-formed pattern: {s}"
+  | none => throwError s!"invalid non-well-formed pattern: {s}"
 
 #guard nel![PatternSegmentNonWF.oneStar] = nel![PatternSegmentNonWF.oneStar]
 #guard PatternNonWF.fromStringStrict "*" = .some nel![PatternSegmentNonWF.oneStar]

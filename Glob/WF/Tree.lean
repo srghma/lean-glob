@@ -5,23 +5,6 @@ import Lean.Elab.Command
 
 open Tree
 
-/--
-Match a single pattern segment against a tree dir name.
-- `lit s` matches if `s = name`.
-- `oneStar` matches any single name.
-- `doubleStar` is handled at pattern list level, not here.
--/
-def PatternSegmentNonWF.matchNES (seg : PatternSegmentNonWF) (name : NonEmptyString) : Bool :=
-  match seg with
-  | .lit s => s == name
-  | .oneStar => true
-  | .doubleStar => false
-
-def PatternSegmentNonWF.matchS (seg : PatternSegmentNonWF) (name : String) : Bool :=
-  match NonEmptyString.fromString? name with
-  | none => false
-  | some name' => PatternSegmentNonWF.matchNES seg name'
-
 mutual
   def globList : List PatternSegmentNonWF → Tree → Option Tree
     | [], t => some (match t with
@@ -101,6 +84,8 @@ private def globManyValidated (pvs : NonEmptyList PatternValidated) (t : Tree) :
 instance : TreeGlobForPattern PatternValidated where
   glob := globValidated
   globMany := globManyValidated
+
+namespace Tests
 
 open TreeGlobForPattern
 
@@ -183,3 +168,5 @@ def globTestExample2 := tree! "Root" {
     "foo"  { "bar" { "baz.txt" } },
     "foo2" { "bar" { "qux2.md" } }
   })
+
+end Tests

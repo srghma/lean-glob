@@ -23,15 +23,10 @@ elab "patternLax" pat:str : term => do
   | .error e => throwError e.toHumanReadable
   | .ok pat => return (Lean.toExpr pat)
 
--- (normalize:Bool = false)
 elab "patternStrict" pat:str : term => do
-  let s := pat.getString
-  match PatternNonWF'.fromStringStrict s with
-  | .none => throwError "did some segment was empty? e.g. `foo//bar` should be `foo/bar`"
-  | .some pat => match (PatternValidated.mk? pat) with
-    | .error .invalidEmpty => throwError PatternValidatedError.invalidEmpty.toHumanReadable
-    | .error .invalidWrongOrdering => throwError (s!"Probably You wanted to write {PatternNonWF'.toString $ normalizeSegments pat}\n{PatternValidatedError.invalidWrongOrdering.toHumanReadable}")
-    | .ok pat => return (Lean.toExpr pat)
+  match PatternValidated.patternStrict? pat.getString with
+  | .error e => throwError e
+  | .ok pat => return (Lean.toExpr pat)
 
 #check_failure patternLax ""
 #guard (patternLax "**" |>.pattern) == patternNonWFLax "**"
