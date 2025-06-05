@@ -23,6 +23,8 @@ open System (FilePath)
 `mkTestGlob pat t expected` returns a pair
 ```lean
   (testName, IO Unit)
+```
+
 where testName is derived from pat, and the IO Unit runs runGlobTest.
 
 pat is the pattern string (the first argument to #testGlob)
@@ -31,8 +33,9 @@ t is the Tree to search in
 
 expected is the Option Tree you expect back
 -/
+
 -- def main : IO Unit := return
 def main : IO Unit := do
   GlobSpec.runGlobTests
   -- runTests #[
-    -- ("FindRecursive", fun (currentTmpDir : FilePath) => do -- TODO: this is a limitation of glob-posix, no support of recursion
+  -- ("FindRecursive", fun (currentTmpDir : FilePath) => do -- TODO: this is a limitation of glob-posix, no support of recursion

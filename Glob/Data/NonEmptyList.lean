@@ -1,11 +1,11 @@
+import Batteries.Data.List.Basic
+import Init.System.IO
 import Lean
 import Lean.Data.RBMap
-import Std.Data.HashSet
 import Lean.Data.RBTree
-import Init.System.IO
 import Lean.Elab.Term
 import Lean.Parser.Term
-import Batteries.Data.List.Basic
+import Std.Data.HashSet
 
 structure NonEmptyList (α : Type u) where
   toList : List α
@@ -19,7 +19,7 @@ instance [BEq α] : BEq (NonEmptyList α) where
   beq a b := a.toList == b.toList
 
 instance [ToString α] : ToString (NonEmptyList α) where
-  toString a := toString a.toList
+  toString a := "nel!" ++ toString a.toList
 
 instance [Inhabited α] : Inhabited (NonEmptyList α) where
   default := ⟨[default], List.cons_ne_nil default []⟩

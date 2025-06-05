@@ -1,4 +1,5 @@
 import Glob
+import Glob.Data.NonEmptyList
 import Glob.Data.Tree
 import Glob.WF.IO
 import Glob.WF.Tree
@@ -23,26 +24,26 @@ def glob (pattern : PatternValidated) (tree : Tree) : Option Tree := none
 def globMany (patterns : NonEmptyList PatternValidated) (tree : Tree) : Option Tree := none
 
 -- Helper to assert glob results match expected Tree
-def assertGlobResult (name : String) (pattern : String) (tree : Tree) (expected : Option Tree) : IO Unit := do
+def assertGlobResult (pattern : String) (tree : Tree) (expected : Option Tree) : IO Unit := do
   let patternValidated ← PatternValidated.patternStrictIO! pattern
   let actual := glob patternValidated tree
   unless actual == expected do
-    IO.println s!"❌ {name} failed:"
+    IO.println s!"❌ {pattern} failed:"
     IO.println s!"  Pattern: {pattern}"
     IO.println s!"  Expected: {reprStr expected}"
     IO.println s!"  Actual: {reprStr actual}"
-    throw <| IO.Error.userError s!"Assertion failed: {name}"
+    throw <| IO.Error.userError s!"Assertion failed: {pattern}"
 
 -- Helper to assert globMany results match expected Tree
-def assertGlobManyResult (name : String) (patternsNel : NonEmptyList String) (tree : Tree) (expected : Option Tree) : IO Unit := do
+def assertGlobManyResult (patternsNel : NonEmptyList String) (tree : Tree) (expected : Option Tree) : IO Unit := do
   let patternsNel' ← patternsNel.mapM PatternValidated.patternStrictIO!
   let actual := globMany patternsNel' tree
   unless actual == expected do
-    IO.println s!"❌ {name} failed:"
+    IO.println s!"❌ {toString patternsNel} failed:"
     IO.println s!"  Patterns: {patternsNel}"
     IO.println s!"  Expected: {reprStr expected}"
     IO.println s!"  Actual: {reprStr actual}"
-    throw <| IO.Error.userError s!"Assertion failed: {name}"
+    throw <| IO.Error.userError s!"Assertion failed: {toString patternsNel}"
 
 -- Test data
 def globTestExample1 := tree! "Glob" { "A" { "X" { } }, "B" { "Y" { } } }
@@ -58,19 +59,19 @@ def globTestExample2 := tree! "Root" {
 def testBasicGlob : IO Unit := do
   IO.println "Testing basic glob patterns..."
 
-  assertGlobResult "Glob root match" "Glob"
+  assertGlobResult "Glob"
     (tree! "Glob" { "A" { } })
     (some (tree! "Glob" {}))
 
-  assertGlobResult "Glob/A match" "Glob/A"
+  assertGlobResult "Glob/A"
     (tree! "Glob" { "A" { } })
     (some (tree! "Glob" { "A" { } }))
 
-  assertGlobResult "Glob/A match without children" "Glob/A"
+  assertGlobResult "Glob/A"
     (tree! "Glob" { "A" })
     (some (tree! "Glob" { "A" }))
 
-  assertGlobResult "Glob/B no match" "Glob/B"
+  assertGlobResult "Glob/B"
     (tree! "Glob" { "A" { } })
     none
 
@@ -78,27 +79,27 @@ def testBasicGlob : IO Unit := do
 def testWildcardGlob : IO Unit := do
   IO.println "Testing wildcard patterns..."
 
-  assertGlobResult "Double star match" "**"
+  assertGlobResult "**"
     globTestExample1
     (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
 
-  assertGlobResult "**/X recursive match" "**/X"
+  assertGlobResult "**/X"
     globTestExample1
     (some (tree! "Glob" { "A" { "X" {} } }))
 
-  assertGlobResult "**/Y recursive match" "**/Y"
+  assertGlobResult "**/Y"
     globTestExample1
     (some (tree! "Glob" { "B" { "Y" {} } }))
 
-  assertGlobResult "**/Z no match" "**/Z"
+  assertGlobResult "**/Z"
     globTestExample1
     none
 
-  assertGlobResult "Glob/* single level" "Glob/*"
+  assertGlobResult "Glob/*"
     globTestExample1
     (some (tree! "Glob" { "A" {}, "B" {} }))
 
-  assertGlobResult "Glob/** recursive" "Glob/**"
+  assertGlobResult "Glob/**"
     globTestExample1
     (some globTestExample1)
 
@@ -106,23 +107,23 @@ def testWildcardGlob : IO Unit := do
 def testSpecificPaths : IO Unit := do
   IO.println "Testing specific path patterns..."
 
-  assertGlobResult "Glob/A/* match" "Glob/A/*"
+  assertGlobResult "Glob/A/*"
     globTestExample1
     (some (tree! "Glob" { "A" { "X" {} } }))
 
-  assertGlobResult "Glob/A/** recursive" "Glob/A/**"
+  assertGlobResult "Glob/A/**"
     globTestExample1
     (some (tree! "Glob" { "A" { "X" { } } }))
 
-  assertGlobResult "Glob/A/X exact match" "Glob/A/X"
+  assertGlobResult "Glob/A/X"
     globTestExample1
     (some (tree! "Glob" { "A" { "X" {} } }))
 
-  assertGlobResult "Glob/B/** recursive" "Glob/B/**"
+  assertGlobResult "Glob/B/**"
     globTestExample1
     (some (tree! "Glob" { "B" { "Y" {} } }))
 
-  assertGlobResult "Glob/C no match" "Glob/C"
+  assertGlobResult "Glob/C"
     globTestExample1
     none
 
@@ -130,11 +131,11 @@ def testSpecificPaths : IO Unit := do
 def testSimpleTrees : IO Unit := do
   IO.println "Testing simple tree patterns..."
 
-  assertGlobResult "Single star match" "*"
+  assertGlobResult "*"
     (tree! "foo" {})
     (some (tree! "foo" {}))
 
-  assertGlobResult "Double star on simple tree" "**"
+  assertGlobResult "**"
     (tree! "root" {})
     (some (tree! "root" {}))
 
@@ -142,31 +143,31 @@ def testSimpleTrees : IO Unit := do
 def testComplexTree : IO Unit := do
   IO.println "Testing complex tree patterns..."
 
-  assertGlobResult "**/baz.txt deep search" "**/baz.txt"
+  assertGlobResult "**/baz.txt"
     globTestExample2
     (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
 
-  assertGlobResult "**/delta.txt deep search" "**/delta.txt"
+  assertGlobResult "**/delta.txt"
     globTestExample2
     (some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } }))
 
-  assertGlobResult "**/file.txt search" "**/file.txt"
+  assertGlobResult "**/file.txt"
     globTestExample2
     (some (tree! "Root" { "foo" { "file.txt"  } }))
 
-  assertGlobResult "**/qux.md search" "**/qux.md"
+  assertGlobResult "**/qux.md"
     globTestExample2
     (some (tree! "Root" { "foo" { "bar" { "qux.md" } } }))
 
-  assertGlobResult "Root exact match" "Root"
+  assertGlobResult "Root"
     globTestExample2
     (some (tree! "Root" {}))
 
-  assertGlobResult "Root/* first level" "Root/*"
+  assertGlobResult "Root/*"
     globTestExample2
     (some (Tree.dir "Root" [Tree.dir "foo" [], Tree.dir "foo2" [], Tree.dir "alpha" [], Tree.dir "zeta" []]))
 
-  assertGlobResult "Root/** full tree" "Root/**"
+  assertGlobResult "Root/**"
     globTestExample2
     (some globTestExample2)
 
@@ -174,19 +175,19 @@ def testComplexTree : IO Unit := do
 def testMultiLevelPatterns : IO Unit := do
   IO.println "Testing multi-level patterns..."
 
-  assertGlobResult "Root/**/bar/* nested wildcard" "Root/**/bar/*"
+  assertGlobResult "Root/**/bar/*"
     globTestExample2
     (some (tree! "Root" { "foo" { "bar" { "baz.txt", "qux.md" } }, "foo2" { "bar" { "baz2.txt", "qux2.md" } } }))
 
-  assertGlobResult "Root/**/delta.txt deep nested" "Root/**/delta.txt"
+  assertGlobResult "Root/**/delta.txt"
     globTestExample2
     (some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } }))
 
-  assertGlobResult "Root/**/file.txt nested search" "Root/**/file.txt"
+  assertGlobResult "Root/**/file.txt"
     globTestExample2
     (some (tree! "Root" { "foo" { "file.txt"  } }))
 
-  assertGlobResult "Root/*/*/*/delta.txt exact depth" "Root/*/*/*/delta.txt"
+  assertGlobResult "Root/*/*/*/delta.txt"
     globTestExample2
     (some (tree! "Root" { "alpha" { "beta" { "gamma" { "delta.txt"  } } } }))
 
@@ -194,27 +195,27 @@ def testMultiLevelPatterns : IO Unit := do
 def testSpecificCombinations : IO Unit := do
   IO.println "Testing specific path combinations..."
 
-  assertGlobResult "Root/foo/**/baz.txt" "Root/foo/**/baz.txt"
+  assertGlobResult "Root/foo/**/baz.txt"
     globTestExample2
     (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
 
-  assertGlobResult "Root/foo/*/baz.txt" "Root/foo/*/baz.txt"
+  assertGlobResult "Root/foo/*/baz.txt"
     globTestExample2
     (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
 
-  assertGlobResult "Root/foo/*/doesntexist.txt no match" "Root/foo/*/doesntexist.txt"
+  assertGlobResult "Root/foo/*/doesntexist.txt"
     globTestExample2
     none
 
-  assertGlobResult "Root/foo/bar/baz.txt exact" "Root/foo/bar/baz.txt"
+  assertGlobResult "Root/foo/bar/baz.txt"
     globTestExample2
     (some (tree! "Root" { "foo" { "bar" { "baz.txt"  } } }))
 
-  assertGlobResult "Root/foo/bar/baz.txt/extra invalid" "Root/foo/bar/baz.txt/extra"
+  assertGlobResult "Root/foo/bar/baz.txt/extra"
     globTestExample2
     none
 
-  assertGlobResult "Root/foo/bar/notfound.txt no match" "Root/foo/bar/notfound.txt"
+  assertGlobResult "Root/foo/bar/notfound.txt"
     globTestExample2
     none
 
@@ -222,34 +223,21 @@ def testSpecificCombinations : IO Unit := do
 def testGlobMany : IO Unit := do
   IO.println "Testing globMany patterns..."
 
-  assertGlobManyResult "GlobMany test 1" nel!["Glob/A", "Glob/B"]
-    (tree! "Glob" { "A" {}, "B" {} })
-    (some (tree! "Glob" { "A" {}, "B" {} }))
-
-  assertGlobManyResult "GlobMany test 2" nel!["Glob/A", "Glob/C"]
-    (tree! "Glob" { "A" {}, "B" {} })
-    (some (tree! "Glob" { "A" {} }))
-
-  assertGlobManyResult "GlobMany test 3" nel!["**/X", "**/Y"]
-    globTestExample1
-    (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
-
-  assertGlobManyResult "GlobMany test 4" nel!["**/baz.txt", "**/delta.txt"]
+  assertGlobManyResult nel!["Glob/A", "Glob/B"] (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {}, "B" {} }))
+  assertGlobManyResult nel!["Glob/A", "Glob/C"] (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {} }))
+  assertGlobManyResult nel!["**/X", "**/Y"] globTestExample1 (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
+  assertGlobManyResult nel!["**/baz.txt", "**/delta.txt"]
     globTestExample2
     (some (tree! "Root" {
       "foo"   { "bar" { "baz.txt" } },
       "alpha" { "beta" { "gamma" { "delta.txt" } } }
     }))
 
-  assertGlobManyResult "GlobMany test 5" nel!["**/file.txt", "**/qux.md"]
-    globTestExample2
-    (some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } }))
+  assertGlobManyResult nel!["**/file.txt", "**/qux.md"] globTestExample2 (some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } }))
 
-  assertGlobManyResult "GlobMany test 6" nel!["**/doesntexist.txt", "**/missing.txt"]
-    globTestExample2
-    none
+  assertGlobManyResult nel!["**/doesntexist.txt", "**/missing.txt"] globTestExample2 none
 
-  assertGlobManyResult "GlobMany test 7" nel!["Root/foo/bar/baz.txt", "Root/foo2/bar/qux2.md"]
+  assertGlobManyResult nel!["Root/foo/bar/baz.txt", "Root/foo2/bar/qux2.md"]
     globTestExample2
     (some (tree! "Root" {
       "foo"  { "bar" { "baz.txt" } },
@@ -275,4 +263,4 @@ def runGlobTests : IO Unit := do
     IO.println s!"❌ Glob tests failed: {e}"
     throw e
 
-end
+end GlobSpec
