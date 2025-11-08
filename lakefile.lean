@@ -6,6 +6,8 @@ open Lake DSL System
 require LeanSpec from git "https://github.com/srghma/lean-spec.git" @ "main"
 
 require Regex from git "https://github.com/pandaman64/lean-regex.git" @ "main" / "regex"
+
+require NonEmpty from git "https://github.com/srghma/lean-nonempty.git" @ "main"
 -- require "leanprover-community" / "mathlib"
 require "leanprover-community" / "batteries" @ git "main"
 -- require LeanCopilot from git "https://github.com/lean-dojo/LeanCopilot.git" @ "main"
