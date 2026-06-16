@@ -13,9 +13,9 @@ subDir = "regex"
 
 [[require]]
 name = "NonEmpty"
-path = "/home/srghma/projects/lean-nonempty/"
-# git = "https://github.com/srghma/lean-nonempty.git"
-# rev = "main"
+# path = "/home/srghma/projects/lean-nonempty/"
+git = "https://github.com/srghma/lean-nonempty.git"
+rev = "main"
 # rev = "43dc93d470e73ce64d1bbdd074f0454c7c9bbfc7"
 
 [[require]]
