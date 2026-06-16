@@ -1,6 +1,12 @@
-import LSpec
-import Glob.Data.NonEmptyString
+module
+public import LSpec
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+@[expose] public section
 
+open NonEmpty.String NonEmpty.List
 open LSpec SlimCheck Gen
 
 def genNonEmptyString : Gen NonEmptyString := do
@@ -32,3 +38,5 @@ def NonEmptyString.shrink (s : NonEmptyString) : List NonEmptyString :=
   s.shrinkByRemovingIndividualElements ++ s.shrinkByRemovingSuffixes
 
 instance : Shrinkable NonEmptyString := Shrinkable.mk NonEmptyString.shrink
+
+end

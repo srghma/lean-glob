@@ -1,18 +1,20 @@
-import Glob
-import Glob.WF.IO
-import Glob.WF.Tree
-import Init.Data.Repr
-import Init.System.IO
-import LSpec
-import Lean
-import Lean.Data.RBMap
-import Lean.Data.RBTree
-import Lean.Elab.Term
-import Lean.Parser.Term
-import Std
-import Std.Data.HashSet
-import Test.GlobSpec
--- import Test.NormalizeReturnsIsValidSpec
+module
+public import Glob
+public import Glob.WF.IO
+public import Glob.WF.Tree
+public import Init.Data.Repr
+public import Init.System.IO
+public import LSpec
+public import Lean
+public import Lean.Data.RBMap
+public import Lean.Data.RBTree
+public import Lean.Elab.Term
+public import Lean.Parser.Term
+public import Std
+public import Std.Data.HashSet
+public import GlobTest.GlobSpec
+
+@[expose] public section
 
 open IO Lean
 open IO.FS
@@ -39,3 +41,5 @@ def main : IO Unit := do
   GlobSpec.runGlobTests
   -- runTests #[
   -- ("FindRecursive", fun (currentTmpDir : FilePath) => do -- TODO: this is a limitation of glob-posix, no support of recursion
+
+end

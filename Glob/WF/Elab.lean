@@ -1,21 +1,24 @@
-import Init.System.IO
-import Lean
-import Lean.Data.RBMap
-import Std.Data.HashSet
-import Lean.Data.RBTree
-import Init.System.IO
-import Lean.Elab.Term
-import Init.Meta
-import Lean.Parser.Term
-import Glob.Data.NonEmptyString
-import Glob.Data.NonEmptyList
-import Glob.Utils.NEFromTo
--- import Mathlib.Data.List.Induction
--- import Aesop
--- import LeanCopilot
-import Glob.NonWF.Types
-import Glob.NonWF.Normalize
-import Glob.WF.Types
+module
+public import Init.System.IO
+public import Lean
+public import Lean.Data.RBMap
+public import Std.Data.HashSet
+public import Lean.Data.RBTree
+public import Lean.Elab.Term
+public import Init.Meta
+public import Lean.Parser.Term
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+public import Glob.NonWF.Types
+public import Glob.NonWF.Normalize
+public meta import Glob.NonWF.Macros
+public meta import Glob.WF.Types
+
+@[expose] public section
+
+open NonEmpty.String NonEmpty.List
 
 elab "patternLax" pat:str : term => do
   let s := pat.getString
@@ -28,7 +31,10 @@ elab "patternStrict" pat:str : term => do
   | .error e => throwError e
   | .ok pat => return (Lean.toExpr pat)
 
-#check_failure patternLax ""
+/--
+info: Pattern cannot be empty.
+-/
+#guard_msgs in #check_failure patternLax ""
 #guard (patternLax "**" |>.pattern) == patternNonWFLax "**"
 #guard (patternLax "*" |>.pattern) == patternNonWFLax "*"
 #guard (patternLax "**/*" |>.pattern) == patternNonWFLax "*/**"
@@ -45,6 +51,19 @@ elab "patternStrict" pat:str : term => do
 #guard (patternLax "**/foo/**/baz/**/bar.txt" |>.pattern) == patternNonWFLax "**/foo/**/baz/**/bar.txt"
 #guard (patternLax "*/**/*/foo/*/**/*/baz/*/**/*/bar.txt" |>.pattern) == patternNonWFLax "*/*/**/foo/*/*/**/baz/*/*/**/bar.txt"
 
-#check_failure (patternStrict "")
-#check (patternStrict "s")
-#check_failure (patternStrict "*/**/*/foo/*/**/*/baz/*/**/*/bar.txt")
+/--
+info: Pattern cannot be empty.
+-/
+#guard_msgs in #check_failure (patternStrict "")
+/--
+info: { pattern := [PatternSegmentNonWF.lit { toString := "s", isNonEmpty := ⋯ }], valid_sequence := ⋯ } : PatternValidated
+-/
+#guard_msgs in #check (patternStrict "s")
+/--
+info: Probably You wanted to write */*/**/foo/*/*/**/baz/*/*/**/bar.txt
+Pattern doesn't follow rules:
+  1. Double stars can follow only * or "foo" (**/** is disallowed).
+  2. One stars can follow only * or "foo" (**/* is disallowed).
+-/
+#guard_msgs in #check_failure (patternStrict "*/**/*/foo/*/**/*/baz/*/**/*/bar.txt")
+end

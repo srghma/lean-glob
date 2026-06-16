@@ -1,10 +1,16 @@
-import Lean
-import Init.Data.Format.Basic
-import Glob.Data.NonEmptyList
+module
+public import Lean
+public import Lean.Data.Format
+public import NonEmpty.List
+public import NonEmpty.StringTrimmed
+
+@[expose] public section
+
 open Lean
 open Lean.Parser
 
 open List
+open NonEmpty.List
 
 inductive Tree
 | file (name : String) : Tree
@@ -157,3 +163,5 @@ def Tree.mergeAll1 (rs : NonEmptyList Tree) : Tree :=
 -- Deep merge: .file wins over .dir, even nested
 #guard Tree.merge (.file "deep") (.dir "deep" [.file "sub"]) == .file "deep"
 #guard Tree.merge (.dir "deep" [.file "sub"]) (.file "deep") == .file "deep"
+
+end

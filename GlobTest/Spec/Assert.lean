@@ -1,15 +1,18 @@
-import Init.System.IO
-import Lean.Data.RBTree
-import Lean
-import Lean.Data.RBMap
-import Std.Data.HashSet
-import Lean.Data.RBTree
-import Init.System.IO
-import Lean.Elab.Term
-import Lean.Parser.Term
-import Init.Data.Repr
-import Test.NormalizeReturnsIsValidSpec
-import LSpec
+module
+public import Init.System.IO
+public import Lean.Data.RBTree
+public import Lean
+public import Lean.Data.RBMap
+public import Std.Data.HashSet
+public import Lean.Data.RBTree
+public import Init.System.IO
+public import Lean.Elab.Term
+public import Lean.Parser.Term
+public import Init.Data.Repr
+public import GlobTest.NormalizeReturnsIsValidSpec
+public import LSpec
+
+@[expose] public section
 
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
@@ -60,3 +63,5 @@ def assertThrows (name : String) (ioAction : IO Unit) : IO Unit := do
 
 /- def assertGlob (pattern : Pattern) (expected : ?a) : IO Unit := -/
 /-   assertEq (Pattern.toString pattern) expected (← glob (← IO.Process.setCurrentDir) pattern) -/
+
+end

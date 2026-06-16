@@ -1,4 +1,7 @@
-import LSpec
+module
+public import LSpec
+
+@[expose] public section
 
 open LSpec SlimCheck Gen
 
@@ -14,3 +17,5 @@ def List.shrinkByRemovingSuffixes (xs : List a) : List (List a) :=
   | _  => (List.range (xs.length)).reverse.map (fun n => xs.take n)
 
 def List.shrink (xs : List a) : List (List a) := List.shrinkByRemovingSuffixes xs ++ List.shrinkByRemovingSuffixes xs
+
+end

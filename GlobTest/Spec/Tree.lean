@@ -1,5 +1,8 @@
-import Glob.Data.Tree
-import Init.System.IO
+module
+public import Glob.Data.Tree
+public import Init.System.IO
+
+@[expose] public section
 
 open System
 
@@ -28,3 +31,5 @@ def withinTempDirTree (t : Tree) (cont : IO α) : IO α :=
 
 def withinTempDirForest (ts : List Tree) (cont : IO α) : IO α :=
   withTempDirForest ts (do IO.Process.setCurrentDir ·; cont)
+
+end

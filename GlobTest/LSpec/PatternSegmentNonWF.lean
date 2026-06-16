@@ -1,9 +1,16 @@
-import LSpec
-import Glob.NonWF.Normalize
-import Glob.Data.NonEmptyString
-import Test.LSpec.NonEmptyString
-import Aesop
+module
+public import LSpec
+public import Glob.NonWF.Normalize
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+public import GlobTest.LSpec.NonEmptyString
+public import Aesop
 
+@[expose] public section
+
+open NonEmpty.String NonEmpty.List
 open LSpec SlimCheck Gen
 
 def genPatternSegmentNonWF : Gen PatternSegmentNonWF := do
@@ -23,3 +30,5 @@ def PatternSegmentNonWF.shrink (x : PatternSegmentNonWF) : List PatternSegmentNo
   | .lit s => (NonEmptyString.shrinkByRemovingSuffixes s).map .lit
   | .oneStar => []
   | .doubleStar => []
+
+end

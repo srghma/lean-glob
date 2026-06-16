@@ -1,3 +1,6 @@
+module
+@[expose] public section
+
 --   runTests #[
 --     ("FindRecursive", fun (currentTmpDir : FilePath) => do -- TODO: this is a limitation of glob-posix, no support of recursion
 --       writeFile "foo.txt" "content"
@@ -124,3 +127,5 @@
 --     --   IO.println s!"TestErrFlag: Results: {results}"
 --     -- )
 --     /- ] -/
+
+end

@@ -1,32 +1,36 @@
-import Glob
-import Glob.Data.NonEmptyList
-import Glob.Data.Tree
-import Glob.WF.IO
-import Glob.WF.Tree
-import Init.Data.Repr
-import Init.System.IO
-import LSpec
-import Lean
-import Lean.Data.RBMap
-import Lean.Data.RBTree
-import Lean.Elab.Term
-import Lean.Parser.Term
-import Std.Data.HashSet
-import Test.NormalizeReturnsIsValidSpec
+module
+public import Glob
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+public import Glob.Data.Tree
+public import Glob.WF.IO
+public import Glob.WF.Tree
+public import Init.Data.Repr
+public import Init.System.IO
+public import LSpec
+public import Lean
+public import Lean.Data.RBMap
+public import Lean.Data.RBTree
+public import Lean.Elab.Term
+public import Lean.Parser.Term
+public import Std.Data.HashSet
+public import GlobTest.NormalizeReturnsIsValidSpec
+
+@[expose] public section
+
+open NonEmpty.String NonEmpty.List
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 
 namespace GlobSpec
 
--- Updated function signatures to match the actual glob functions
-def glob (pattern : PatternValidated) (tree : Tree) : Option Tree := none
-def globMany (patterns : NonEmptyList PatternValidated) (tree : Tree) : Option Tree := none
-
 -- Helper to assert glob results match expected Tree
 def assertGlobResult (pattern : String) (tree : Tree) (expected : Option Tree) : IO Unit := do
   let patternValidated ← PatternValidated.patternStrictIO! pattern
-  let actual := glob patternValidated tree
+  let actual := Glob.globValidated patternValidated tree
   unless actual == expected do
     IO.println s!"❌ {pattern} failed:"
     IO.println s!"  Pattern: {pattern}"
@@ -37,7 +41,7 @@ def assertGlobResult (pattern : String) (tree : Tree) (expected : Option Tree) :
 -- Helper to assert globMany results match expected Tree
 def assertGlobManyResult (patternsNel : NonEmptyList String) (tree : Tree) (expected : Option Tree) : IO Unit := do
   let patternsNel' ← patternsNel.mapM PatternValidated.patternStrictIO!
-  let actual := globMany patternsNel' tree
+  let actual := Glob.globManyValidated patternsNel' tree
   unless actual == expected do
     IO.println s!"❌ {toString patternsNel} failed:"
     IO.println s!"  Patterns: {patternsNel}"
@@ -109,7 +113,7 @@ def testSpecificPaths : IO Unit := do
 
   assertGlobResult "Glob/A/*"
     globTestExample1
-    (some (tree! "Glob" { "A" { "X" {} } }))
+    (some (tree! "Glob" { "A" { "X" { } } }))
 
   assertGlobResult "Glob/A/**"
     globTestExample1
@@ -223,21 +227,21 @@ def testSpecificCombinations : IO Unit := do
 def testGlobMany : IO Unit := do
   IO.println "Testing globMany patterns..."
 
-  assertGlobManyResult nel!["Glob/A", "Glob/B"] (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {}, "B" {} }))
-  assertGlobManyResult nel!["Glob/A", "Glob/C"] (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {} }))
-  assertGlobManyResult nel!["**/X", "**/Y"] globTestExample1 (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
-  assertGlobManyResult nel!["**/baz.txt", "**/delta.txt"]
+  assertGlobManyResult (NonEmptyList.mk ["Glob/A", "Glob/B"] (by simp)) (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {}, "B" {} }))
+  assertGlobManyResult (NonEmptyList.mk ["Glob/A", "Glob/C"] (by simp)) (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {} }))
+  assertGlobManyResult (NonEmptyList.mk ["**/X", "**/Y"] (by simp)) globTestExample1 (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
+  assertGlobManyResult (NonEmptyList.mk ["**/baz.txt", "**/delta.txt"] (by simp))
     globTestExample2
     (some (tree! "Root" {
       "foo"   { "bar" { "baz.txt" } },
       "alpha" { "beta" { "gamma" { "delta.txt" } } }
     }))
 
-  assertGlobManyResult nel!["**/file.txt", "**/qux.md"] globTestExample2 (some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } }))
+  assertGlobManyResult (NonEmptyList.mk ["**/file.txt", "**/qux.md"] (by simp)) globTestExample2 (some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } }))
 
-  assertGlobManyResult nel!["**/doesntexist.txt", "**/missing.txt"] globTestExample2 none
+  assertGlobManyResult (NonEmptyList.mk ["**/doesntexist.txt", "**/missing.txt"] (by simp)) globTestExample2 none
 
-  assertGlobManyResult nel!["Root/foo/bar/baz.txt", "Root/foo2/bar/qux2.md"]
+  assertGlobManyResult (NonEmptyList.mk ["Root/foo/bar/baz.txt", "Root/foo2/bar/qux2.md"] (by simp))
     globTestExample2
     (some (tree! "Root" {
       "foo"  { "bar" { "baz.txt" } },
@@ -264,3 +268,4 @@ def runGlobTests : IO Unit := do
     throw e
 
 end GlobSpec
+end

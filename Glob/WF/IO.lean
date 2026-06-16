@@ -1,22 +1,23 @@
-import Init.System.IO
-import Lean
-import Lean.Data.RBMap
-import Std.Data.HashSet
-import Lean.Data.RBTree
-import Init.System.IO
-import Lean.Elab.Term
-import Init.Meta
-import Lean.Parser.Term
-import Glob.Data.NonEmptyString
-import Glob.Data.NonEmptyList
-import Glob.Utils.NEFromTo
--- import Mathlib.Data.List.Induction
--- import Aesop
--- import LeanCopilot
-import Glob.NonWF.Types
-import Glob.WF.Types
-import Glob.WF.Elab
+module
+public import Init.System.IO
+public import Lean
+public import Lean.Data.RBMap
+public import Std.Data.HashSet
+public import Lean.Data.RBTree
+public import Lean.Elab.Term
+public import Init.Meta
+public import Lean.Parser.Term
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+public import Glob.NonWF.Types
+public import Glob.WF.Types
+public import Glob.WF.Elab
 
+@[expose] public section
+
+open NonEmpty.String NonEmpty.List
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
@@ -57,3 +58,4 @@ open System (FilePath)
 --       | .error (.noFileOrDirectory ..) => return #[]
 --       | .error e => throw e
 --     return results.join
+end

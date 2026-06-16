@@ -1,10 +1,17 @@
-import Lean
-import Lean.Elab.Term
-import Lean.Parser.Term
-import Glob.Data.NonEmptyString
-import Glob.Data.NonEmptyList
-import Glob.NonWF.Types
-import Glob.NonWF.Normalize
+module
+public import Lean
+public import Lean.Elab.Term
+public import Lean.Parser.Term
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+public import Glob.NonWF.Types
+public import Glob.NonWF.Normalize
+
+@[expose] public section
+
+open NonEmpty.String NonEmpty.List
 
 --------------------------------------
 
@@ -54,10 +61,6 @@ instance : Inhabited PatternValidated where
 
 open Lean Meta Elab
 
--- Helper function to create decidable proofs (same as in the regex library)
-private def mkDecidableProof (prop : Expr) (inst : Expr) : Expr :=
-  let refl := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``true)
-  mkApp3 (mkConst ``of_decide_eq_true) prop inst refl
 
 -- Now the main ToExpr instance for PatternValidated
 instance : ToExpr PatternValidated where
@@ -127,10 +130,12 @@ def PatternValidated.patternStrict? (str : String) : Except String PatternValida
   | .none => throw "Did some segment was empty? `foo//bar` should be `foo/bar`"
   | .some pat => match (PatternValidated.mk? pat) with
     | .error .invalidEmpty => throw PatternValidatedError.invalidEmpty.toHumanReadable
-    | .error .invalidWrongOrdering => throw (s!"Probably You wanted to write {PatternNonWF'.toString $ normalizeSegments pat}\n{PatternValidatedError.invalidWrongOrdering.toHumanReadable}")
+    | .error .invalidWrongOrdering => throw (s!"Probably You wanted to write {PatternNonWF'.toString $ normalizeSegments pat}
+{PatternValidatedError.invalidWrongOrdering.toHumanReadable}")
     | .ok pat => return pat
 
 def PatternValidated.patternStrictIO! (str : String) : IO PatternValidated := do
   match PatternValidated.patternStrict? str with
   | .ok  pat => pure pat
   | .error err => throw <| IO.userError err
+end

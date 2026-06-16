@@ -1,16 +1,23 @@
-import Init.System.IO
-import Lean
-import Lean.Data.RBMap
-import Std.Data.HashSet
-import Lean.Data.RBTree
-import Init.System.IO
-import Lean.Elab.Term
-import Init.Meta
-import Lean.Parser.Term
-import Glob.Data.NonEmptyString
-import Glob.Data.NonEmptyList
-import Glob.Utils.NEFromTo
+module
+public import Init.System.IO
+public import Lean
+public import Lean.Data.RBMap
+public import Std.Data.HashSet
+public import Lean.Data.RBTree
+public import Lean.Elab.Term
+public import Init.Meta
+public import Lean.Parser.Term
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.String.ToExpr
+public import NonEmpty.List.ToExpr
+meta import NonEmpty.String.ToExpr
+meta import NonEmpty.List.ToExpr
+public import NonEmpty.List.Upgraders
+@[expose] public section
 
+open NonEmpty.String NonEmpty.List
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
@@ -29,7 +36,7 @@ open Lean Meta Elab
 instance : ToExpr PatternSegmentNonWF where
   toTypeExpr := mkConst ``PatternSegmentNonWF
   toExpr
-    | .lit nes => mkApp (mkConst ``PatternSegmentNonWF.lit) (toExpr nes)
+    | .lit nes => mkApp (mkConst ``PatternSegmentNonWF.lit) (@toExpr _ instToExprNonEmptyString nes)
     | .oneStar => mkConst ``PatternSegmentNonWF.oneStar
     | .doubleStar => mkConst ``PatternSegmentNonWF.doubleStar
 
@@ -85,27 +92,17 @@ def PatternNonWF'.toString (ps : PatternNonWF') : String := String.intercalate "
 def PatternNonWF'.fromStringStrict (s : String) : Option PatternNonWF' :=
   if s == "" then some [] -- empty pattern, OK
   else
-    s.split (· == '/')
-    |> ToNE.Traverse.«LS->LNES»
+    (s.split (· == '/')).toList.map (·.toString)
+    |> NonEmpty.List.Traverse.«L/S->L/NES»
     |>.map (·.map PatternSegmentNonWF.fromNES)
 
 def PatternNonWF'.fromStringLax (s : String) : PatternNonWF' :=
-  s.split (· == '/')
-  |> ToNE.FilterMap.«LS->LNES»
+  (s.split (· == '/')).toList.map (·.toString)
+  |> NonEmpty.List.FilterMap.«L/S->L/NES»
   |>.map PatternSegmentNonWF.fromNES
 
 def PatternNonWF.toString : PatternNonWF -> String := (PatternNonWF'.toString ·.toList)
 def PatternNonWF.fromStringStrict : String -> Option PatternNonWF := (PatternNonWF'.fromStringStrict · >>= NonEmptyList.fromList?)
 
-elab "patternNonWFLax" pat:str : term => return Lean.toExpr (PatternNonWF'.fromStringLax pat.getString)
-
-elab "patternNonWFStrict" pat:str : term => do
-  let s := pat.getString
-  match PatternNonWF.fromStringStrict s with
-  | some (p : NonEmptyList PatternSegmentNonWF) => return (Lean.toExpr p)
-  | none => throwError s!"invalid non-well-formed pattern: {s}"
-
-#guard nel![PatternSegmentNonWF.oneStar] = nel![PatternSegmentNonWF.oneStar]
-#guard PatternNonWF.fromStringStrict "*" = .some nel![PatternSegmentNonWF.oneStar]
-#guard patternNonWFLax "*" = [PatternSegmentNonWF.oneStar]
-#guard patternNonWFStrict "*" = nel![PatternSegmentNonWF.oneStar]
+-- moved to Macros
+end

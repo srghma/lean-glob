@@ -1,13 +1,10 @@
-/-
-Copyright (c) 2024. All rights reserved.
-Safe FilePath wrapper inspired by purescript-pathy
-Provides type-safe path operations preventing invalid path constructions
--/
+module
+public import Init.System.FilePath
+public import Init.Data.Option.Basic
+public import Init.Data.String.Basic
+public import Lean
 
-import Init.System.FilePath
-import Init.Data.Option.Basic
-import Init.Data.String.Basic
-import Lean
+@[expose] public section
 
 namespace SafePath
 
@@ -16,12 +13,12 @@ namespace SafePath
 
 -- Phantom types for path classification
 inductive PathType where
-  | Rel : PathType  -- Relative path
-  | Abs : PathType  -- Absolute path
+  | Rel -- Relative path
+  | Abs -- Absolute path
 
 inductive FileType where
-  | Dir  : FileType  -- Directory
-  | File : FileType  -- File
+  | Dir  -- Directory
+  | File -- File
 
 -- The main Path type with phantom type parameters
 structure Path (pathType : PathType) (fileType : FileType) where
@@ -223,5 +220,7 @@ def SafePath.IO.Process.getCurrentDir : IO FilePath := _root_.IO.Process.getCurr
 def SafePath.IO.Process.setCurrentDir (path : FilePath) : IO Unit := _root_.IO.Process.setCurrentDir path
 def SafePath.IO.Prim.setAccessRights (filename : FilePath) (mode : UInt32) : IO Unit := _root_.IO.Prim.setAccessRights filename mode
 def SafePath.IO.setAccessRights (filename : FilePath) (mode : FileRight) : IO Unit := _root_.IO.setAccessRights filename mode
+
+end
 
 end

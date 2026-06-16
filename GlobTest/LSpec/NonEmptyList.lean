@@ -1,6 +1,12 @@
-import LSpec
-import Glob.Data.NonEmptyList
+module
+public import LSpec
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+@[expose] public section
 
+open NonEmpty.String NonEmpty.List
 open LSpec SlimCheck Gen
 
 def nonEmptyListOf (x : Gen α) : Gen (NonEmptyList α) := return NonEmptyList.cons' (← x) (← listOf x)
@@ -17,3 +23,5 @@ def NonEmptyList.shrinkByRemovingSuffixes (xs : NonEmptyList a) : List (NonEmpty
 
 -- Default
 def NonEmptyList.shrink (xs : NonEmptyList a) : List (NonEmptyList a) := NonEmptyList.shrinkByRemovingSuffixes xs ++ NonEmptyList.shrinkByRemovingSuffixes xs
+
+end

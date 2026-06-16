@@ -1,0 +1,51 @@
+name = "glob"
+version = "0.1.0"
+keywords = ["glob", "pattern", "matching"]
+testDriver = "test"
+defaultTargets = ["Glob"]
+
+[[require]]
+name = "Regex"
+# git = "https://github.com/pandaman64/lean-regex.git"
+git = "https://github.com/srghma/lean-regex.git"
+rev = "main"
+subDir = "regex"
+
+[[require]]
+name = "NonEmpty"
+path = "/home/srghma/projects/lean-nonempty/"
+# git = "https://github.com/srghma/lean-nonempty.git"
+# rev = "main"
+# rev = "43dc93d470e73ce64d1bbdd074f0454c7c9bbfc7"
+
+[[require]]
+name = "batteries"
+scope = "leanprover-community"
+rev = "v4.31.0"
+
+[[require]]
+name = "aesop"
+scope = "leanprover-community"
+rev = "v4.31.0"
+
+[[require]]
+name = "LSpec"
+git = "https://github.com/srghma/LSpec"
+# git = "https://github.com/argumentcomputer/LSpec"
+rev = "main"
+
+[[lean_lib]]
+name = "Glob"
+roots = ["Glob"]
+
+[[lean_lib]]
+name = "GlobTest"
+roots = ["GlobTest"]
+
+[[lean_lib]]
+name = "Pathy"
+roots = ["Pathy"]
+
+[[lean_exe]]
+name = "test"
+root = "GlobTest.Main"

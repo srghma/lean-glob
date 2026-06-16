@@ -1,3 +1,4 @@
+module
 import Init.System.IO
 import Lean
 import Lean.Data.RBMap
@@ -7,9 +8,15 @@ import Init.System.IO
 import Lean.Elab.Term
 import Init.Meta
 import Lean.Parser.Term
-import Glob.Data.NonEmptyString
-import Glob.Data.NonEmptyList
-import Glob.Utils.NEFromTo
+import NonEmpty.String
+import NonEmpty.List
+import NonEmpty.Aliases.FunctorsAndScalars
+import NonEmpty.List.Upgraders
+open NonEmpty.String NonEmpty.List
+import NonEmpty.String
+import NonEmpty.List
+import NonEmpty.Aliases.FunctorsAndScalars
+import NonEmpty.List.Upgraders
 -- import Mathlib.Data.List.Induction -- REQUIRED
 -- import Aesop
 import Glob.NonWF

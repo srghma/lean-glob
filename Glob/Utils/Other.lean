@@ -1,23 +1,24 @@
-import Init.System.IO
-import Lean
-import Lean.Data.RBMap
-import Std.Data.HashSet
-import Lean.Data.RBTree
-import Init.System.IO
-import Lean.Elab.Term
-import Init.Meta
-import Lean.Parser.Term
-import Glob.Data.NonEmptyString
-import Glob.Data.NonEmptyList
-import Glob.Utils.NEFromTo
+module
+public import Init.System.IO
+public import Lean
+public import Lean.Data.RBMap
+public import Std.Data.HashSet
+public import Lean.Data.RBTree
+public import Lean.Elab.Term
+public import Init.Meta
+public import Lean.Parser.Term
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+@[expose] public section
 
+open NonEmpty.String NonEmpty.List NonEmpty.Aliases
 open System (FilePath)
 
-private abbrev LNES := List NonEmptyString
-private abbrev NELNES := NonEmptyList NonEmptyString
-
 -- \f<< -> \f>>
-@[inline] def FilePath.Lax.«->LNES» (p : FilePath) : LNES := ToNE.FilterMap.«LS->LNES» p.components
-@[inline] def FilePath.Lax.«->NELNES»  (p : FilePath) : Option NELNES := ToNE.FilterMap.«LS->NELNES» p.components
-@[inline] def FilePath.Strict.«->LNES» (p : FilePath) : Option LNES := ToNE.Traverse.«LS->LNES» p.components
-@[inline] def FilePath.Strict.«->NELNES» (p : FilePath) : Option NELNES := ToNE.Traverse.«LS->NELNES» p.components
+@[inline] def FilePath.Lax.«->L/NES» (p : FilePath) : «L/NES» := NonEmpty.List.FilterMap.«L/S->L/NES» p.components
+@[inline] def FilePath.Lax.«->NEL/NES»  (p : FilePath) : Option «NEL/NES» := NonEmpty.List.FilterMap.«L/S->NEL/NES» p.components
+@[inline] def FilePath.Strict.«->L/NES» (p : FilePath) : Option «L/NES» := NonEmpty.List.Traverse.«L/S->L/NES» p.components
+@[inline] def FilePath.Strict.«->NEL/NES» (p : FilePath) : Option «NEL/NES» := NonEmpty.List.Traverse.«L/S->NEL/NES» p.components
+end

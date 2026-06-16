@@ -1,9 +1,18 @@
-import Glob.WF.Elab
-import Glob.Data.Tree
-import Aesop
-import Lean.Elab.Command
+module
+public import NonEmpty.String
+public import NonEmpty.List
+public import NonEmpty.Aliases.FunctorsAndScalars
+public import NonEmpty.List.Upgraders
+public import Glob.WF.Elab
+public import Glob.Data.Tree
+public meta import Glob.Data.Tree
+public import Lean.Elab.Command
 
-open Tree
+@[expose] public section
+
+open Tree NonEmpty.String NonEmpty.List
+
+namespace Glob
 
 mutual
   def globList : List PatternSegmentNonWF → Tree → Option Tree
@@ -50,44 +59,46 @@ class TreeGlobForPattern (α : Type) where
   glob : α → Tree → Option Tree
   globMany : NonEmptyList α → Tree → Option Tree
 
-private def globManyList (xss : NonEmptyList (List PatternSegmentNonWF)) (t : Tree) : Option Tree :=
+protected def globManyList (xss : NonEmptyList (List PatternSegmentNonWF)) (t : Tree) : Option Tree :=
   xss.toList.filterMap (globList · t)
   |> NonEmptyList.fromList?
   |>.map Tree.mergeAll1
 
 instance : TreeGlobForPattern (List PatternSegmentNonWF) where
   glob := globList
-  globMany := globManyList
+  globMany := Glob.globManyList
 
-private def globNEL (ps : NonEmptyList PatternSegmentNonWF) (t : Tree) : Option Tree :=
+protected def globNEL (ps : NonEmptyList PatternSegmentNonWF) (t : Tree) : Option Tree :=
   match ps with
   | ⟨[], _⟩ => by contradiction
   | ⟨ps, h⟩ => globList ps t
 
-private def globManyNEL (xss : NonEmptyList (NonEmptyList PatternSegmentNonWF)) (t : Tree) : Option Tree :=
-  xss.toList.filterMap (globNEL · t)
+protected def globManyNEL (xss : NonEmptyList (NonEmptyList PatternSegmentNonWF)) (t : Tree) : Option Tree :=
+  xss.toList.filterMap (Glob.globNEL · t)
   |> NonEmptyList.fromList?
   |>.map Tree.mergeAll1
 
 instance : TreeGlobForPattern (NonEmptyList PatternSegmentNonWF) where
-  glob := globNEL
-  globMany := globManyNEL
+  glob := Glob.globNEL
+  globMany := Glob.globManyNEL
 
-private def globValidated (pv : PatternValidated) (t : Tree) : Option Tree :=
-  NonEmptyList.fromList? pv.pattern >>= (globNEL · t)
+def globValidated (pv : PatternValidated) (t : Tree) : Option Tree :=
+  NonEmptyList.fromList? pv.pattern >>= (Glob.globNEL · t)
 
-private def globManyValidated (pvs : NonEmptyList PatternValidated) (t : Tree) : Option Tree :=
-  pvs.toList.filterMap (globValidated · t)
+def globManyValidated (pvs : NonEmptyList PatternValidated) (t : Tree) : Option Tree
+  := pvs.toList.filterMap (globValidated · t)
   |> NonEmptyList.fromList?
   |>.map Tree.mergeAll1
 
 instance : TreeGlobForPattern PatternValidated where
-  glob := globValidated
-  globMany := globManyValidated
+  glob := Glob.globValidated
+  globMany := Glob.globManyValidated
+
+end Glob
 
 namespace Tests
 
-open TreeGlobForPattern
+open Glob Glob.TreeGlobForPattern
 
 open Lean Elab Command Meta
 
@@ -97,10 +108,15 @@ macro_rules
   `(#guard glob (patternStrict $a) $b = $c
     #guard glob (patternNonWFStrict $a) $b = $c)
 
-#testGlob "Glob" (tree! "Glob" { "A" { } }) = some (tree! "Glob" {})
+#testGlob "*" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
+#testGlob "**" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
+#testGlob "Glob" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
 #testGlob "Glob/A" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
 #testGlob "Glob/A" (tree! "Glob" { "A" }) = some (tree! "Glob" { "A" })
+-- #testGlob "Glob/A/" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
+-- #testGlob "Glob/A/" (tree! "Glob" { "A" }) = none
 #testGlob "Glob/B" (tree! "Glob" { "A" { } }) = none
+#testGlob "Glob/B" (tree! "Glob" { "A" }) = none
 
 def globTestExample1 := tree! "Glob" { "A" { "X" { } }, "B" { "Y" { } } }
 
@@ -144,29 +160,36 @@ def globTestExample2 := tree! "Root" {
 #testGlob "Root/foo/bar/baz.txt/extra" globTestExample2 = none
 #testGlob "Root/foo/bar/notfound.txt" globTestExample2 = none
 
-#guard globMany (nel![patternStrict "Glob/A", patternStrict "Glob/B"]) (tree! "Glob" { "A" {}, "B" {} }) = some (tree! "Glob" { "A" {}, "B" {} })
-#guard globMany (nel![patternStrict "Glob/A", patternStrict "Glob/B"]) (tree! "Glob" { "A" {}, "B" {} }) = some (tree! "Glob" { "A" {}, "B" {} })
+#guard globMany ![patternStrict "Glob/A", patternStrict "Glob/B"] (tree! "Glob" { "A" {}, "B" {} }) = some (tree! "Glob" { "A" {}, "B" {} })
+#guard globMany ![patternStrict "Glob/A", patternStrict "Glob/B"] (tree! "Glob" { "A" {}, "B" {} }) = some (tree! "Glob" { "A" {}, "B" {} })
 
-#guard globMany (nel![patternStrict "Glob/A", patternStrict "Glob/C"]) (tree! "Glob" { "A" {}, "B" {} })
+#guard globMany ![patternStrict "Glob/A", patternStrict "Glob/C"] (tree! "Glob" { "A" {}, "B" {} })
   = some (tree! "Glob" { "A" {} })
 
-#guard globMany (nel![patternStrict "**/X", patternStrict "**/Y"]) globTestExample1
+#guard globMany ![patternStrict "**/X", patternStrict "**/Y"] globTestExample1
   = some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } })
 
-#guard globMany (nel![patternStrict "**/baz.txt", patternStrict "**/delta.txt"]) globTestExample2
+#guard globMany ![patternStrict "**/baz.txt", patternStrict "**/delta.txt"] globTestExample2
   = some (tree! "Root" {
     "foo"   { "bar" { "baz.txt" } },
     "alpha" { "beta" { "gamma" { "delta.txt" } } }
   })
 
-#guard globMany (nel![patternStrict "**/file.txt", patternStrict "**/qux.md"]) globTestExample2 = some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } })
+#guard globMany ![patternStrict "**/file.txt", patternStrict "**/qux.md"] globTestExample2 = some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } })
 
-#guard globMany (nel![patternStrict "**/doesntexist.txt", patternStrict "**/missing.txt"]) globTestExample2 = none
+#guard globMany ![patternStrict "**/doesntexist.txt", patternStrict "**/missing.txt"] globTestExample2 = none
 
-#guard globMany (nel![patternStrict "Root/foo/bar/baz.txt", patternStrict "Root/foo2/bar/qux2.md"]) globTestExample2
+#guard globMany ![patternStrict "Root/foo/bar/baz.txt", patternStrict "Root/foo2/bar/qux2.md"] globTestExample2
+  = some (tree! "Root" {
+    "foo"  { "bar" { "baz.txt" } },
+    "foo2" { "bar" { "qux2.md" } }
+  })
+
+#guard globMany ![patternStrict "Root/foo/bar/baz.txt", patternStrict "Root/foo2/bar/qux2.md"] globTestExample2
   = some (tree! "Root" {
     "foo"  { "bar" { "baz.txt" } },
     "foo2" { "bar" { "qux2.md" } }
   })
 
 end Tests
+end
