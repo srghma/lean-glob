@@ -227,21 +227,21 @@ def testSpecificCombinations : IO Unit := do
 def testGlobMany : IO Unit := do
   IO.println "Testing globMany patterns..."
 
-  assertGlobManyResult (NonEmptyList.mk ["Glob/A", "Glob/B"] (by simp)) (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {}, "B" {} }))
-  assertGlobManyResult (NonEmptyList.mk ["Glob/A", "Glob/C"] (by simp)) (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {} }))
-  assertGlobManyResult (NonEmptyList.mk ["**/X", "**/Y"] (by simp)) globTestExample1 (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
-  assertGlobManyResult (NonEmptyList.mk ["**/baz.txt", "**/delta.txt"] (by simp))
+  assertGlobManyResult !["Glob/A", "Glob/B"] (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {}, "B" {} }))
+  assertGlobManyResult !["Glob/A", "Glob/C"] (tree! "Glob" { "A" {}, "B" {} }) (some (tree! "Glob" { "A" {} }))
+  assertGlobManyResult !["**/X", "**/Y"] globTestExample1 (some (tree! "Glob" { "A" { "X" {} }, "B" { "Y" {} } }))
+  assertGlobManyResult !["**/baz.txt", "**/delta.txt"]
     globTestExample2
     (some (tree! "Root" {
       "foo"   { "bar" { "baz.txt" } },
       "alpha" { "beta" { "gamma" { "delta.txt" } } }
     }))
 
-  assertGlobManyResult (NonEmptyList.mk ["**/file.txt", "**/qux.md"] (by simp)) globTestExample2 (some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } }))
+  assertGlobManyResult !["**/file.txt", "**/qux.md"] globTestExample2 (some (tree! "Root" { "foo" { "file.txt", "bar" { "qux.md" } } }))
 
-  assertGlobManyResult (NonEmptyList.mk ["**/doesntexist.txt", "**/missing.txt"] (by simp)) globTestExample2 none
+  assertGlobManyResult !["**/doesntexist.txt", "**/missing.txt"] globTestExample2 none
 
-  assertGlobManyResult (NonEmptyList.mk ["Root/foo/bar/baz.txt", "Root/foo2/bar/qux2.md"] (by simp))
+  assertGlobManyResult !["Root/foo/bar/baz.txt", "Root/foo2/bar/qux2.md"]
     globTestExample2
     (some (tree! "Root" {
       "foo"  { "bar" { "baz.txt" } },

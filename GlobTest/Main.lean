@@ -13,6 +13,7 @@ public import Lean.Parser.Term
 public import Std
 public import Std.Data.HashSet
 public import GlobTest.GlobSpec
+public import GlobTest.GlobRealSpec
 
 @[expose] public section
 
@@ -39,6 +40,7 @@ expected is the Option Tree you expect back
 -- def main : IO Unit := return
 def main : IO Unit := do
   GlobSpec.runGlobTests
+  runGlobRealTests
   -- runTests #[
   -- ("FindRecursive", fun (currentTmpDir : FilePath) => do -- TODO: this is a limitation of glob-posix, no support of recursion
 

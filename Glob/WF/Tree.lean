@@ -108,9 +108,9 @@ macro_rules
   `(#guard glob (patternStrict $a) $b = $c
     #guard glob (patternNonWFStrict $a) $b = $c)
 
-#testGlob "*" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
+#testGlob "*" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { })
 #testGlob "**" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
-#testGlob "Glob" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
+#testGlob "Glob" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { })
 #testGlob "Glob/A" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })
 #testGlob "Glob/A" (tree! "Glob" { "A" }) = some (tree! "Glob" { "A" })
 -- #testGlob "Glob/A/" (tree! "Glob" { "A" { } }) = some (tree! "Glob" { "A" { } })

@@ -10,7 +10,7 @@ public import GlobTest.LSpec.PatternSegmentNonWF
 
 @[expose] public section
 
-open LSpec SlimCheck Gen
+open LSpec SlimCheck Gen NonEmpty.List
 
 instance : Shrinkable PatternSegmentNonWF := Shrinkable.mk PatternSegmentNonWF.shrink
 
@@ -31,11 +31,9 @@ instance : SampleableExt (List PatternSegmentNonWF) :=
 instance : SampleableExt (NonEmptyList PatternSegmentNonWF) :=
   SampleableExt.mkSelfContained (nonEmptyListOf genPatternSegmentNonWF)
 
-#lspec check "normalize gives isValid path in output"
-  (∀ globPath : NonEmptyList PatternSegmentNonWF, isValidSequence (normalizeSegments globPath.toList))
-
 def suite := [
+  check "normalize gives isValid path in output" (∀ globPath : NonEmptyList PatternSegmentNonWF, isValidSequence (normalizeSegments globPath.toList)),
   check "normalize gives non-empty result" (∀ globPath : List PatternSegmentNonWF, (normalizeSegments globPath) ≠ [])
 ]
 
-end NormalizeReturnsIsValidSpec
+end

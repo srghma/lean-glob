@@ -11,11 +11,11 @@ open LSpec SlimCheck Gen
 
 def String.shrinkByRemovingIndividualElements (s : String) : List String :=
   let cs := s.toList
-  (List.range cs.length).map (fun i => (cs.eraseIdx i).asString)
+  (List.range cs.length).map (fun i => String.ofList (cs.eraseIdx i))
 
 def String.shrinkByRemovingSuffixes (s : String) : List String :=
   let cs := s.toList
-  (List.range cs.length).reverse.map fun n => (cs.take n).asString
+  (List.range cs.length).reverse.map fun n => String.ofList (cs.take n)
 
 def String.shrink (s : String) : List String := shrinkByRemovingIndividualElements s ++ shrinkByRemovingSuffixes s
 

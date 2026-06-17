@@ -13,7 +13,7 @@ elab "patternNonWFStrict" pat:str : term => do
   | some (p : NonEmptyList PatternSegmentNonWF) => return (Lean.toExpr p)
   | none => throwError s!"invalid non-well-formed pattern: {s}"
 
-#guard NonEmptyList.mk [PatternSegmentNonWF.oneStar] (by simp) = NonEmptyList.mk [PatternSegmentNonWF.oneStar] (by simp)
-#guard PatternNonWF.fromStringStrict "*" = .some (NonEmptyList.mk [PatternSegmentNonWF.oneStar] (by simp))
+#guard ![PatternSegmentNonWF.oneStar] = ![PatternSegmentNonWF.oneStar]
+#guard PatternNonWF.fromStringStrict "*" = .some (![PatternSegmentNonWF.oneStar])
 #guard patternNonWFLax "*" = [PatternSegmentNonWF.oneStar]
-#guard patternNonWFStrict "*" = NonEmptyList.mk [PatternSegmentNonWF.oneStar] (by simp)
+#guard patternNonWFStrict "*" = ![PatternSegmentNonWF.oneStar]

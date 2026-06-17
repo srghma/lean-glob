@@ -12,7 +12,7 @@ open LSpec SlimCheck Gen
 def genNonEmptyString : Gen NonEmptyString := do
   -- generate a non-empty list of characters (at least 1 char)
   let chars ← listOf (pure 'a') -- (chooseChar 'a' 'z')
-  return NonEmptyString.fromLChar! chars
+  return (NonEmptyString.fromLChar? chars).getD (nes!"ERROR")
 
 def NonEmptyString.shrinkByRemovingIndividualElements (s : NonEmptyString) : List NonEmptyString :=
   let cs := s.toString.toList
@@ -35,7 +35,7 @@ def NonEmptyString.shrinkByRemovingSuffixes (s : NonEmptyString) : List NonEmpty
   shrunk
 
 def NonEmptyString.shrink (s : NonEmptyString) : List NonEmptyString :=
-  s.shrinkByRemovingIndividualElements ++ s.shrinkByRemovingSuffixes
+  shrinkByRemovingIndividualElements s ++ shrinkByRemovingSuffixes s
 
 instance : Shrinkable NonEmptyString := Shrinkable.mk NonEmptyString.shrink
 
