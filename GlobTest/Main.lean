@@ -21,6 +21,7 @@ open IO Lean
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
+open GlobTest.Spec.Core
 
 /--
 `mkTestGlob pat t expected` returns a pair
@@ -37,11 +38,12 @@ t is the Tree to search in
 expected is the Option Tree you expect back
 -/
 
--- def main : IO Unit := return
-def main : IO Unit := do
-  GlobSpec.runGlobTests
+def main : IO UInt32 := do
+  let c1 ← runSpec GlobSpec.spec
   runGlobRealTests
-  -- runTests #[
-  -- ("FindRecursive", fun (currentTmpDir : FilePath) => do -- TODO: this is a limitation of glob-posix, no support of recursion
+  if c1 > 0 then
+    return 1
+  else
+    return 0
 
 end

@@ -17,6 +17,7 @@ public import Lean.Elab.Term
 public import Lean.Parser.Term
 public import Std.Data.HashSet
 public import GlobTest.NormalizeReturnsIsValidSpec
+public import GlobTest.Spec.Core
 
 @[expose] public section
 

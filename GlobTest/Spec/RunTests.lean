@@ -21,25 +21,4 @@ def withinTempDir (cont : IO α) : IO α := do
     IO.println s!"⏰ Running in temporary directory: {tmpDir}"
     cont
 
-def runTests (tests : Array (String × (IO Unit))) : IO Unit := do
-  let mut successCount := 0
-  let totalCount := tests.size
-  let originalCwd ← IO.currentDir
-  for (name, testFn) in tests do
-    IO.println s!"
---- ⏰ Running Test: {name} ---"
-    try
-      testFn
-      IO.println s!"✅ {name} passed."
-      successCount := successCount + 1
-    catch e =>
-      IO.println s!"❌ {name} failed with error: {e}"
-    finally
-      IO.Process.setCurrentDir originalCwd
-  IO.println s!"
---- Test Summary ---"
-  IO.println s!"Total tests: {totalCount}, Passed: {successCount}, Failed: {totalCount - successCount}"
-  unless successCount == totalCount do
-    throw <| IO.Error.userError "Some tests failed!"
-
 end

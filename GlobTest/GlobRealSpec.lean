@@ -8,8 +8,6 @@ public import NonEmpty.List
 public import NonEmpty.String
 public import GlobTest.FileFinder
 
-
-
 @[expose] public section
 
 open System (FilePath)
@@ -18,7 +16,7 @@ open NonEmpty.List
 open NonEmpty.String
 
 
-def runGlobRealTests : IO Unit := do
+def runGlobRealTests : SpecM Unit := do
   runTests #[
     ("FindRecursive", withinTempDir do
       writeFile "foo.txt" "content"
@@ -147,5 +145,3 @@ def runGlobRealTests : IO Unit := do
     --   IO.println s!"TestErrFlag: Results: {results}"
     -- )
   ]
-
-end

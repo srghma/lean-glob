@@ -57,7 +57,7 @@ def assertThrows (name : String) (ioAction : IO Unit) : IO Unit := do
     IO.println s!"❌ {name} failed: Expected an error, but no error was thrown."
     throw <| IO.Error.userError s!"Assertion failed: {name}"
 
-partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List String) : Bool :=
+partial def matchSegments (pattern : PatternValidated) (path : List String) : Bool :=
   match pattern, path with
   | [], [] => true
   | [], _ => false
@@ -78,7 +78,7 @@ def getFilesAndDirs (dir : String) : IO (Array String) := do
     arr := arr.push (stripDotSlash p.toString)
   return arr
 
-def globFS (pattern : NonEmptyList PatternSegmentNonWF) : IO (Array String) := do
+def globFS (pattern : PatternValidated) : IO (Array String) := do
   let all ← getFilesAndDirs "."
   let mut matched := #[]
   for p in all do
@@ -87,7 +87,7 @@ def globFS (pattern : NonEmptyList PatternSegmentNonWF) : IO (Array String) := d
       matched := matched.push p
   return matched
 
-def globWithDirMark (patternStr : String) : IO (Array String) := do
+def globWithDirMark (p : PatternValidated) : IO (Array String) := do
   let pat ← match PatternValidated.patternStrict? patternStr with
     | .ok p => match NonEmptyList.fromList? p.pattern with
       | some nel => pure nel
@@ -124,7 +124,7 @@ def assertGlob (pattern : PatternValidated) (expected : Array String) : IO Unit 
     assertEq s!"assertGlob {nel}" expected actual
   | none => throw (IO.userError "Pattern cannot be empty")
 
-def assertGlobMany (patterns : NonEmptyList (NonEmptyList PatternSegmentNonWF)) (expected : Array String) : IO Unit := do
+def assertGlobMany (patterns : PatternValidated) (expected : Array String) : IO Unit := do
   let mut actual := #[]
   for p in patterns.toList do
     let res ← globFS p
