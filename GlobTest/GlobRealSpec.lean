@@ -52,13 +52,12 @@ def runGlobRealTests : IO Unit := do
       writeFile "apricot" "content"
       writeFile "banana" "content"
       assertGlob (assertAreEqualAndReturnFirst (patternStrict "a[p-r]*") ![PatternSegmentNonWF.regex (Regex.parse! "^a[p-r].*$")]) #["apple", "apricot"]),
-    -- ("GlobWithDirMark", do
-    --   let _tmpDir ← IO.currentDir
-    --   writeFile "file.txt" "content"
-    --   createDir "mydir"
-    --   createDir "another_dir"
-    --   let expected := #["file.txt", "mydir/", "another_dir/"]
-    --   assertEq "globWithDirMark *" expected (← globWithDirMark "*")),
+    ("GlobWithDirMark", withinTempDir do
+      writeFile "file.txt" "content"
+      createDir "mydir"
+      createDir "another_dir"
+      let expected := #["file.txt", "mydir/", "another_dir/"]
+      assertEq "globWithDirMark *" expected (← globWithDirMark "*")),
     -- ("GlobUnsorted", do
     --   let _tmpDir ← IO.currentDir
     --   writeFile "c.txt" "c"

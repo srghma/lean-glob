@@ -87,6 +87,31 @@ def globFS (pattern : NonEmptyList PatternSegmentNonWF) : IO (Array String) := d
       matched := matched.push p
   return matched
 
+def globWithDirMark (patternStr : String) : IO (Array String) := do
+  let pat ← match PatternValidated.patternStrict? patternStr with
+    | .ok p => match NonEmptyList.fromList? p.pattern with
+      | some nel => pure nel
+      | none => throw (IO.userError "Empty pattern")
+    | .error e => throw (IO.userError s!"Invalid pattern: {e}")
+
+  let files ← findRec "." (fun _ => true)
+  let dirs ← findDirsRec "."
+
+  let mut allItems := #[]
+  for p in files do
+    allItems := allItems.push (stripDotSlash p.toString, false)
+  for p in dirs do
+    allItems := allItems.push (stripDotSlash p.toString, true)
+
+  let mut matched := #[]
+  for (p, isDir) in allItems do
+    let pathSegments := (p.splitOn "/").filter (· ≠ "")
+    if matchSegments pat.toList pathSegments then
+      if isDir then
+        matched := matched.push (p ++ "/")
+      else
+        matched := matched.push p
+  return matched.qsort (· < ·)
 
 def assertAreEqualAndReturnFirst (a : PatternValidated) (b : List PatternSegmentNonWF) : PatternValidated :=
   if a.pattern == b then a
