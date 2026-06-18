@@ -6,7 +6,6 @@ public import Glob.WF.Types
 public import Glob.WF.Elab
 public import NonEmpty.List
 public import NonEmpty.String
-public import GlobTest.FileFinder
 
 @[expose] public section
 
@@ -61,20 +60,13 @@ def globRealSpec : Spec := do
       let expected := #["file.txt", "mydir/", "another_dir/"]
       assertEq "globWithDirMark *" expected (← globWithDirMark tmpDir (patternStrict "*"))
 
-    -- it "GlobUnsorted" do withinTempDir fun tmpDir => do
-    --   writeFile (tmpDir / "c.txt") "c"
-    --   writeFile (tmpDir / "a.txt") "a"
-    --   writeFile (tmpDir / "b.txt") "b"
-    --   -- We can't assert a specific order, just that all are present and count is correct.
-    --   assertEq "globUnsorted *.txt" #["a.txt", "b.txt", "c.txt"] (← globUnsorted "*.txt")
-    --
-    -- it "CheckPattern" do withinTempDir fun tmpDir => do
-    --   writeFile (tmpDir / "existing.txt") "content"
-    --   writeFile (tmpDir / "another.md") "content"
-    --   assertBool "checkPattern *.txt (true)" true (← checkPattern "*.txt")
-    --   assertBool "checkPattern *.xyz (false)" false (← checkPattern "*.xyz")
-    --   assertBool "checkPattern existing.txt (true)" true (← checkPattern "existing.txt")
-    --   assertBool "checkPattern non_existing.txt (false)" false (← checkPattern "non_existing.txt")
+    it "CheckPattern" do withinTempDir fun tmpDir => do
+      writeFile (tmpDir / "existing.txt") "content"
+      writeFile (tmpDir / "another.md") "content"
+      assertBool "checkPattern *.txt (true)" true (← checkPattern tmpDir (patternStrict "*.txt"))
+      assertBool "checkPattern *.xyz (false)" false (← checkPattern tmpDir (patternStrict "*.xyz"))
+      assertBool "checkPattern existing.txt (true)" true (← checkPattern tmpDir (patternStrict "existing.txt"))
+      assertBool "checkPattern non_existing.txt (false)" false (← checkPattern tmpDir (patternStrict "non_existing.txt"))
 
     it "GlobMany" do withinTempDir fun tmpDir => do
       writeFile (tmpDir / "file.txt") "content"

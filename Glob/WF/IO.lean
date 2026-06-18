@@ -22,40 +22,120 @@ open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 
--- partial def walkDir
---   (p : FilePath)
---   (enter : String → Bool)
---   (shouldAddFileToListOfFilepaths : String → Bool) : IO (Array FilePath) :=
---   go p
--- where
---   go (p : FilePath) : IO (Array FilePath) := do
---     if !enter p.fileName then
---       return #[]
---
---     let entries ← p.readDir
---     let results ← entries.mapM fun d => do
---       let root := d.root
---       let fileName := d.fileName
---       let path := d.path
---       let includeSelf := if shouldAddFileToListOfFilepaths fileName then #[path] else #[]
---
---       match (← path.metadata.toBaseIO) with
---       | .ok { type := .symlink, .. } =>
---         let real ← IO.FS.realPath path
---         if (← real.isDir) then
---           -- don't call enter on symlink again
---           if enter p.fileName then
---             let sub ← go real
---             return includeSelf ++ sub
---           else
---             return includeSelf
---         else
---           return includeSelf
---       | .ok { type := .dir, .. } =>
---         let sub ← go path
---         return includeSelf ++ sub
---       | .ok => return includeSelf
---       | .error (.noFileOrDirectory ..) => return #[]
---       | .error e => throw e
---     return results.join
+def stripDirPrefix (dir : String) (path : String) : String :=
+  let dirWithSlash := if dir.endsWith "/" then dir else dir ++ "/"
+  if path.startsWith dirWithSlash then
+    (path.drop dirWithSlash.length).toString
+  else
+    path
+
+partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List String) : Bool :=
+  match pattern, path with
+  | [], [] => true
+  | [], _ => false
+  | PatternSegmentNonWF.doubleStar :: ps, [] => matchSegments ps []
+  | _ :: _, [] => false
+  | PatternSegmentNonWF.doubleStar :: ps, x :: xs =>
+      matchSegments ps (x :: xs) || matchSegments (PatternSegmentNonWF.doubleStar :: ps) xs
+  | p :: ps, x :: xs =>
+      p.matchS x && matchSegments ps xs
+
+structure DirWalker where
+  root : System.FilePath
+  prune : System.FilePath → IO Bool := fun _ => pure false
+
+partial def DirWalker.forInRec {β : Type} (w : DirWalker) (current : System.FilePath) (init : β) (f : (System.FilePath × Metadata) → β → IO (ForInStep β)) : IO (ForInStep β) := do
+  try
+    let entries ← current.readDir
+    let mut state := init
+    for entry in entries do
+      let path := entry.path
+      let md ← path.metadata
+      let isDir := md.type == FileType.dir
+      
+      -- If the user wants to prune this directory BEFORE visiting it, we can do it here.
+      -- But standard `os.walk` visits the directory, THEN you prune.
+      -- Let's just visit it:
+      match ← f (path, md) state with
+      | .done s => return .done s
+      | .yield s =>
+        state := s
+        if isDir then
+          if !(← w.prune path) then
+            match ← forInRec w path state f with
+            | .done s => return .done s
+            | .yield s => state := s
+    return .yield state
+  catch _ =>
+    return .yield init
+
+instance : ForIn IO DirWalker (System.FilePath × Metadata) where
+  forIn w init f := do
+    match ← DirWalker.forInRec w w.root init f with
+    | .done s => return s
+    | .yield s => return s
+
+def globFS (initDir : FilePath) (pattern : PatternValidated) : IO (Array String) := do
+  let rootDir := initDir.toString
+  let mut matched := #[]
+  for (path, _) in ({ root := initDir : DirWalker }) do
+    let relativePath := stripDirPrefix rootDir path.toString
+    let pathSegments := (relativePath.splitOn "/").filter (· ≠ "")
+    if matchSegments pattern.pattern pathSegments then
+      matched := matched.push relativePath
+  return matched.qsort (· < ·)
+
+def globWithDirMark (initDir : FilePath) (pattern : PatternValidated) : IO (Array String) := do
+  let rootDir := initDir.toString
+  let mut matched := #[]
+  for (path, md) in ({ root := initDir : DirWalker }) do
+    let mut relativePath := stripDirPrefix rootDir path.toString
+    if md.type == FileType.dir && !relativePath.endsWith "/" then
+      relativePath := relativePath ++ "/"
+    let pathSegments := (relativePath.splitOn "/").filter (· ≠ "")
+    if matchSegments pattern.pattern pathSegments then
+      matched := matched.push relativePath
+  return matched.qsort (· < ·)
+
+def checkPattern (initDir : FilePath) (pattern : PatternValidated) : IO Bool := do
+  let rootDir := initDir.toString
+  for (path, _) in ({ root := initDir : DirWalker }) do
+    let relativePath := stripDirPrefix rootDir path.toString
+    let pathSegments := (relativePath.splitOn "/").filter (· ≠ "")
+    if matchSegments pattern.pattern pathSegments then
+      return true
+  return false
+
+def findByExtension (initDir : FilePath) (ext : String) : IO (Array String) := do
+  let rootDir := initDir.toString
+  let mut matched := #[]
+  for (path, md) in ({ root := initDir : DirWalker }) do
+    if md.type != FileType.dir then
+      if path.extension == some ext then
+        let relativePath := stripDirPrefix rootDir path.toString
+        matched := matched.push relativePath
+  return matched.qsort (· < ·)
+
+def findByExtensions (initDir : FilePath) (exts : Array String) : IO (Array String) := do
+  let rootDir := initDir.toString
+  let mut matched := #[]
+  for (path, md) in ({ root := initDir : DirWalker }) do
+    if md.type != FileType.dir then
+      match path.extension with
+      | some e =>
+        if exts.contains e then
+          let relativePath := stripDirPrefix rootDir path.toString
+          matched := matched.push relativePath
+      | none => pure ()
+  return matched.qsort (· < ·)
+
+def findDirectories (initDir : FilePath) : IO (Array String) := do
+  let rootDir := initDir.toString
+  let mut matched := #[]
+  for (path, md) in ({ root := initDir : DirWalker }) do
+    if md.type == FileType.dir then
+      let relativePath := stripDirPrefix rootDir path.toString
+      matched := matched.push (relativePath ++ "/")
+  return matched.qsort (· < ·)
+
 end

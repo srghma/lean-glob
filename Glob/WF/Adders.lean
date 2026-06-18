@@ -12,25 +12,25 @@ import NonEmpty.String
 import NonEmpty.List
 import NonEmpty.Aliases.FunctorsAndScalars
 import NonEmpty.List.Upgraders
-open NonEmpty.String NonEmpty.List
-import NonEmpty.String
-import NonEmpty.List
 import NonEmpty.Aliases.FunctorsAndScalars
 import NonEmpty.List.Upgraders
+import NonEmpty.String
+import NonEmpty.List
 -- import Mathlib.Data.List.Induction -- REQUIRED
 -- import Aesop
-import Glob.NonWF
-import Glob.WF
+import Glob.NonWF.Types
+import Glob.WF.Types
 
+open NonEmpty.String NonEmpty.List
 -- import LeanCopilot
 
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 
-lemma canFollow_anything_lit (prev : PatternSegmentNonWF) (s : NonEmptyString) : canFollow prev (.lit s) := by simp [canFollow]
+theorem canFollow_anything_lit (prev : PatternSegmentNonWF) (s : NonEmptyString) : canFollow prev (.lit s) := by simp [canFollow]
 
-lemma isValidSequence_append_lit (segments : List PatternSegmentNonWF) (s : NonEmptyString)
+theorem isValidSequence_append_lit (segments : List PatternSegmentNonWF) (s : NonEmptyString)
     (h : isValidSequence segments) : isValidSequence (segments ++ [.lit s]) := by
   induction segments with
   | nil =>
@@ -46,12 +46,12 @@ lemma isValidSequence_append_lit (segments : List PatternSegmentNonWF) (s : NonE
       · exact h.1
       · exact ih h.2
 
-lemma isValidSequence_cons_cons (a b : PatternSegmentNonWF) (rest : List PatternSegmentNonWF) :
+theorem isValidSequence_cons_cons (a b : PatternSegmentNonWF) (rest : List PatternSegmentNonWF) :
     isValidSequence (a :: b :: rest) ↔ canFollow a b ∧ isValidSequence (b :: rest) := by simp [isValidSequence]
-lemma canFollow_lit_oneStar (s : NonEmptyString) : canFollow (.lit s) .oneStar := by simp [canFollow]
-lemma canFollow_lit_doubleStar (s : NonEmptyString) : canFollow (.lit s) .doubleStar := by simp [canFollow]
+theorem canFollow_lit_oneStar (s : NonEmptyString) : canFollow (.lit s) .oneStar := by simp [canFollow]
+theorem canFollow_lit_doubleStar (s : NonEmptyString) : canFollow (.lit s) .doubleStar := by simp [canFollow]
 
-lemma isValidSequence_append_oneStar (segments : List PatternSegmentNonWF)
+theorem isValidSequence_append_oneStar (segments : List PatternSegmentNonWF)
     (h : isValidSequence segments)
     (lastIsLit : ∃ s, segments.getLast? = some (.lit s)) :
     isValidSequence (segments ++ [.oneStar]) := by
@@ -72,7 +72,7 @@ lemma isValidSequence_append_oneStar (segments : List PatternSegmentNonWF)
       · exact h.1
       · simp_all only [List.cons_append, forall_const, List.getLast?_cons_cons]
 
-lemma isValidSequence_append_doubleStar (segments : List PatternSegmentNonWF)
+theorem isValidSequence_append_doubleStar (segments : List PatternSegmentNonWF)
     (h : isValidSequence segments)
     (lastIsLit : ∃ s, segments.getLast? = some (.lit s)) :
     isValidSequence (segments ++ [.doubleStar]) := by
@@ -115,7 +115,7 @@ def PatternValidated.addLit (pv : PatternValidated) (s : NonEmptyString) : Patte
   ⟨pv.pattern ++ [.lit s], isValidSequence_append_lit pv.pattern s pv.valid_sequence⟩
 
 -- PatternValidated extensionality
-lemma PatternValidated.ext (pv1 pv2 : PatternValidated)
+theorem PatternValidated.ext (pv1 pv2 : PatternValidated)
     (h : pv1.pattern = pv2.pattern) : pv1 = pv2 := by
   cases pv1 with
   | mk p1 h1 =>

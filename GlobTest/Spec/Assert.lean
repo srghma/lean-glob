@@ -12,7 +12,7 @@ public import Init.Data.Repr
 public import GlobTest.NormalizeReturnsIsValidSpec
 public import Glob.NonWF.Types
 public import LSpec
-public import GlobTest.FileFinder
+public import Glob.WF.IO
 
 @[expose] public section
 
@@ -72,55 +72,7 @@ def withinTempDir (act : FilePath → IO α) : IO α := do
   finally
     try IO.FS.removeDirAll dir catch _ => pure ()
 
-partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List String) : Bool :=
-  match pattern, path with
-  | [], [] => true
-  | [], _ => false
-  | PatternSegmentNonWF.doubleStar :: ps, [] => matchSegments ps []
-  | _ :: _, [] => false
-  | PatternSegmentNonWF.doubleStar :: ps, x :: xs =>
-      matchSegments ps (x :: xs) || matchSegments (PatternSegmentNonWF.doubleStar :: ps) xs
-  | p :: ps, x :: xs =>
-      p.matchS x && matchSegments ps xs
 
-def getFilesAndDirs (dir : String) : IO (Array String) := do
-  let files ← findRec dir (fun _ => true)
-  let dirs ← findDirsRec dir
-  let mut arr := #[]
-  for p in files do
-    arr := arr.push (stripDirPrefix dir p.toString)
-  for p in dirs do
-    arr := arr.push (stripDirPrefix dir p.toString)
-  return arr
-
-def globFS (tmpDir : FilePath) (pattern : PatternValidated) : IO (Array String) := do
-  let all ← getFilesAndDirs tmpDir.toString
-  let mut matched := #[]
-  for p in all do
-    let pathSegments := (p.splitOn "/").filter (· ≠ "")
-    if matchSegments pattern.pattern pathSegments then
-      matched := matched.push p
-  return matched
-
-def globWithDirMark (tmpDir : FilePath) (p : PatternValidated) : IO (Array String) := do
-  let files ← findRec tmpDir.toString (fun _ => true)
-  let dirs ← findDirsRec tmpDir.toString
-
-  let mut allItems := #[]
-  for f in files do
-    allItems := allItems.push (stripDirPrefix tmpDir.toString f.toString, false)
-  for d in dirs do
-    allItems := allItems.push (stripDirPrefix tmpDir.toString d.toString, true)
-
-  let mut matched := #[]
-  for (item, isDir) in allItems do
-    let pathSegments := (item.splitOn "/").filter (· ≠ "")
-    if matchSegments p.pattern pathSegments then
-      if isDir then
-        matched := matched.push (item ++ "/")
-      else
-        matched := matched.push item
-  return matched.qsort (· < ·)
 
 def assertAreEqualAndReturnFirst (a : PatternValidated) (b : List PatternSegmentNonWF) : PatternValidated :=
   if a.pattern == b then a
@@ -141,6 +93,8 @@ def assertGlobMany (tmpDir : FilePath) (patterns : NonEmptyList PatternValidated
       if !actual.contains r then
         actual := actual.push r
   assertEq s!"assertGlobMany" expected actual
+
+
 
 end GlobTest.Spec.Assert
 end
