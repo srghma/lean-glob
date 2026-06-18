@@ -1,1 +1,3 @@
 /.lake
+/.spec-tmp-*/
+/.spec-failures

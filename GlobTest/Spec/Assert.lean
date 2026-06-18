@@ -16,13 +16,15 @@ public import GlobTest.FileFinder
 
 @[expose] public section
 
+namespace GlobTest.Spec.Assert
+
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 open NonEmpty.List
 
 -- Helper for comparing arrays of strings, ignoring order
-def Array.sortedEq (arr1 arr2 : Array String) : Bool :=
+def _root_.Array.sortedEq (arr1 arr2 : Array String) : Bool :=
   arr1.insertionSort == arr2.insertionSort
 
 -- Assertion helpers
@@ -57,7 +59,20 @@ def assertThrows (name : String) (ioAction : IO Unit) : IO Unit := do
     IO.println s!"❌ {name} failed: Expected an error, but no error was thrown."
     throw <| IO.Error.userError s!"Assertion failed: {name}"
 
-partial def matchSegments (pattern : PatternValidated) (path : List String) : Bool :=
+/-- Run `act` inside a fresh temporary directory, restoring the previous working
+directory afterwards. Each parallel test gets its own isolated dir. -/
+def withinTempDir (act : FilePath → IO α) : IO α := do
+  let prev ← IO.currentDir
+  -- unique-ish directory name based on a high-resolution timestamp.
+  let stamp ← IO.monoNanosNow
+  let dir : FilePath := prev / s!".spec-tmp-{stamp}"
+  IO.FS.createDirAll dir
+  try
+    act dir
+  finally
+    try IO.FS.removeDirAll dir catch _ => pure ()
+
+partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List String) : Bool :=
   match pattern, path with
   | [], [] => true
   | [], _ => false
@@ -73,64 +88,59 @@ def getFilesAndDirs (dir : String) : IO (Array String) := do
   let dirs ← findDirsRec dir
   let mut arr := #[]
   for p in files do
-    arr := arr.push (stripDotSlash p.toString)
+    arr := arr.push (stripDirPrefix dir p.toString)
   for p in dirs do
-    arr := arr.push (stripDotSlash p.toString)
+    arr := arr.push (stripDirPrefix dir p.toString)
   return arr
 
-def globFS (pattern : PatternValidated) : IO (Array String) := do
-  let all ← getFilesAndDirs "."
+def globFS (tmpDir : FilePath) (pattern : PatternValidated) : IO (Array String) := do
+  let all ← getFilesAndDirs tmpDir.toString
   let mut matched := #[]
   for p in all do
     let pathSegments := (p.splitOn "/").filter (· ≠ "")
-    if matchSegments pattern.toList pathSegments then
+    if matchSegments pattern.pattern pathSegments then
       matched := matched.push p
   return matched
 
-def globWithDirMark (p : PatternValidated) : IO (Array String) := do
-  let pat ← match PatternValidated.patternStrict? patternStr with
-    | .ok p => match NonEmptyList.fromList? p.pattern with
-      | some nel => pure nel
-      | none => throw (IO.userError "Empty pattern")
-    | .error e => throw (IO.userError s!"Invalid pattern: {e}")
-
-  let files ← findRec "." (fun _ => true)
-  let dirs ← findDirsRec "."
+def globWithDirMark (tmpDir : FilePath) (p : PatternValidated) : IO (Array String) := do
+  let files ← findRec tmpDir.toString (fun _ => true)
+  let dirs ← findDirsRec tmpDir.toString
 
   let mut allItems := #[]
-  for p in files do
-    allItems := allItems.push (stripDotSlash p.toString, false)
-  for p in dirs do
-    allItems := allItems.push (stripDotSlash p.toString, true)
+  for f in files do
+    allItems := allItems.push (stripDirPrefix tmpDir.toString f.toString, false)
+  for d in dirs do
+    allItems := allItems.push (stripDirPrefix tmpDir.toString d.toString, true)
 
   let mut matched := #[]
-  for (p, isDir) in allItems do
-    let pathSegments := (p.splitOn "/").filter (· ≠ "")
-    if matchSegments pat.toList pathSegments then
+  for (item, isDir) in allItems do
+    let pathSegments := (item.splitOn "/").filter (· ≠ "")
+    if matchSegments p.pattern pathSegments then
       if isDir then
-        matched := matched.push (p ++ "/")
+        matched := matched.push (item ++ "/")
       else
-        matched := matched.push p
+        matched := matched.push item
   return matched.qsort (· < ·)
 
 def assertAreEqualAndReturnFirst (a : PatternValidated) (b : List PatternSegmentNonWF) : PatternValidated :=
   if a.pattern == b then a
   else panic! s!"assertAreEqualAndReturnFirst failed: {repr a} != {repr b}"
 
-def assertGlob (pattern : PatternValidated) (expected : Array String) : IO Unit := do
+def assertGlob (tmpDir : FilePath) (pattern : PatternValidated) (expected : Array String) : IO Unit := do
   match NonEmptyList.fromList? pattern.pattern with
   | some nel =>
-    let actual ← globFS nel
+    let actual ← globFS tmpDir pattern
     assertEq s!"assertGlob {nel}" expected actual
   | none => throw (IO.userError "Pattern cannot be empty")
 
-def assertGlobMany (patterns : PatternValidated) (expected : Array String) : IO Unit := do
+def assertGlobMany (tmpDir : FilePath) (patterns : NonEmptyList PatternValidated) (expected : Array String) : IO Unit := do
   let mut actual := #[]
   for p in patterns.toList do
-    let res ← globFS p
+    let res ← globFS tmpDir p
     for r in res do
       if !actual.contains r then
         actual := actual.push r
   assertEq s!"assertGlobMany" expected actual
 
+end GlobTest.Spec.Assert
 end

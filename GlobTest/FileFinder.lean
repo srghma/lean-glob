@@ -20,19 +20,20 @@ partial def findRec (dir : FilePath) (filter : FilePath → Bool) : IO (Array Fi
         result := result.push path
   return result
 
-def stripDotSlash (s : String) : String :=
-  if s.startsWith "./" then s.drop 2 |>.toString else s
+def stripDirPrefix (dir : String) (s : String) : String :=
+  let pref := if dir == "." then "./" else dir ++ "/"
+  if s.startsWith pref then s.drop pref.length |>.toString else s
 
-def findByExtension (ext : String) : IO (Array String) := do
-  let res ← findRec "." fun p => p.extension == some ext
-  let mut arr := res.map (fun p => stripDotSlash p.toString)
+def findByExtension (tmpDir : FilePath) (ext : String) : IO (Array String) := do
+  let res ← findRec tmpDir.toString fun p => p.extension == some ext
+  let mut arr := res.map (fun p => stripDirPrefix tmpDir.toString p.toString)
   return arr.qsort (· < ·)
 
-def findByExtensions (exts : Array String) : IO (Array String) := do
-  let res ← findRec "." fun p => match p.extension with
+def findByExtensions (tmpDir : FilePath) (exts : Array String) : IO (Array String) := do
+  let res ← findRec tmpDir.toString fun p => match p.extension with
     | some e => exts.contains e
     | none => false
-  let mut arr := res.map (fun p => stripDotSlash p.toString)
+  let mut arr := res.map (fun p => stripDirPrefix tmpDir.toString p.toString)
   return arr.qsort (· < ·)
 
 partial def findDirsRec (dir : FilePath) : IO (Array FilePath) := do
@@ -47,9 +48,9 @@ partial def findDirsRec (dir : FilePath) : IO (Array FilePath) := do
       result := result ++ sub
   return result
 
-def findDirectories : IO (Array String) := do
-  let res ← findDirsRec "."
-  let mut arr := res.map (fun p => stripDotSlash p.toString ++ "/")
+def findDirectories (tmpDir : FilePath) : IO (Array String) := do
+  let res ← findDirsRec tmpDir.toString
+  let mut arr := res.map (fun p => stripDirPrefix tmpDir.toString p.toString ++ "/")
   return arr.qsort (· < ·)
 
 end
