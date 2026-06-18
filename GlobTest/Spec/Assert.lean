@@ -10,20 +10,16 @@ public import Lean.Elab.Term
 public import Lean.Parser.Term
 public import Init.Data.Repr
 public import GlobTest.NormalizeReturnsIsValidSpec
+public import Glob.NonWF.Types
 public import LSpec
+public import GlobTest.FileFinder
 
 @[expose] public section
 
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
-
-/-!
-## Test Suite for System.Glob FFI
-
-This test suite creates isolated temporary directories for each test,
-creates files within them, runs glob operations, and asserts the results.
--/
+open NonEmpty.List
 
 -- Helper for comparing arrays of strings, ignoring order
 def Array.sortedEq (arr1 arr2 : Array String) : Bool :=
@@ -61,7 +57,55 @@ def assertThrows (name : String) (ioAction : IO Unit) : IO Unit := do
     IO.println s!"❌ {name} failed: Expected an error, but no error was thrown."
     throw <| IO.Error.userError s!"Assertion failed: {name}"
 
-/- def assertGlob (pattern : Pattern) (expected : ?a) : IO Unit := -/
-/-   assertEq (Pattern.toString pattern) expected (← glob (← IO.Process.setCurrentDir) pattern) -/
+partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List String) : Bool :=
+  match pattern, path with
+  | [], [] => true
+  | [], _ => false
+  | PatternSegmentNonWF.doubleStar :: ps, [] => matchSegments ps []
+  | _ :: _, [] => false
+  | PatternSegmentNonWF.doubleStar :: ps, x :: xs =>
+      matchSegments ps (x :: xs) || matchSegments (PatternSegmentNonWF.doubleStar :: ps) xs
+  | p :: ps, x :: xs =>
+      p.matchS x && matchSegments ps xs
+
+def getFilesAndDirs (dir : String) : IO (Array String) := do
+  let files ← findRec dir (fun _ => true)
+  let dirs ← findDirsRec dir
+  let mut arr := #[]
+  for p in files do
+    arr := arr.push (stripDotSlash p.toString)
+  for p in dirs do
+    arr := arr.push (stripDotSlash p.toString)
+  return arr
+
+def globFS (pattern : NonEmptyList PatternSegmentNonWF) : IO (Array String) := do
+  let all ← getFilesAndDirs "."
+  let mut matched := #[]
+  for p in all do
+    let pathSegments := (p.splitOn "/").filter (· ≠ "")
+    if matchSegments pattern.toList pathSegments then
+      matched := matched.push p
+  return matched
+
+
+def assertAreEqualAndReturnFirst (a : PatternValidated) (b : List PatternSegmentNonWF) : PatternValidated :=
+  if a.pattern == b then a
+  else panic! s!"assertAreEqualAndReturnFirst failed: {repr a} != {repr b}"
+
+def assertGlob (pattern : PatternValidated) (expected : Array String) : IO Unit := do
+  match NonEmptyList.fromList? pattern.pattern with
+  | some nel =>
+    let actual ← globFS nel
+    assertEq s!"assertGlob {nel}" expected actual
+  | none => throw (IO.userError "Pattern cannot be empty")
+
+def assertGlobMany (patterns : NonEmptyList (NonEmptyList PatternSegmentNonWF)) (expected : Array String) : IO Unit := do
+  let mut actual := #[]
+  for p in patterns.toList do
+    let res ← globFS p
+    for r in res do
+      if !actual.contains r then
+        actual := actual.push r
+  assertEq s!"assertGlobMany" expected actual
 
 end

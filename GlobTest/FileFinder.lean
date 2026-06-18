@@ -1,9 +1,10 @@
 module
-import Init.System.IO
+public import Init.System.IO
+
+@[expose] public section
+
 open IO.FS
 open System
-
-namespace FileFinder
 
 partial def findRec (dir : FilePath) (filter : FilePath → Bool) : IO (Array FilePath) := do
   let mut result := #[]
@@ -51,4 +52,4 @@ def findDirectories : IO (Array String) := do
   let mut arr := res.map (fun p => stripDotSlash p.toString ++ "/")
   return arr.qsort (· < ·)
 
-end FileFinder
+end

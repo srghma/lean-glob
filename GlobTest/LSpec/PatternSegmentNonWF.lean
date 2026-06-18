@@ -30,5 +30,6 @@ def PatternSegmentNonWF.shrink (x : PatternSegmentNonWF) : List PatternSegmentNo
   | .lit s => (NonEmptyString.shrinkByRemovingSuffixes s).map .lit
   | .oneStar => []
   | .doubleStar => []
+  | .regex _ => []
 
 end

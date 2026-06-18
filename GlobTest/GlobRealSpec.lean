@@ -3,8 +3,11 @@ public import GlobTest.Spec.RunTests
 public import GlobTest.Spec.Assert
 public import Glob
 public import Glob.WF.Types
+public import Glob.WF.Elab
 public import NonEmpty.List
 public import NonEmpty.String
+public import GlobTest.FileFinder
+
 
 
 @[expose] public section
@@ -14,58 +17,6 @@ open IO.FS
 open NonEmpty.List
 open NonEmpty.String
 
-partial def findRec (dir : FilePath) (filter : FilePath → Bool) : IO (Array FilePath) := do
-  let mut result := #[]
-  let entries ← dir.readDir
-  for entry in entries do
-    let path := entry.path
-    let md ← path.metadata
-    if md.type == FileType.dir then
-      let sub ← findRec path filter
-      result := result ++ sub
-    else
-      if filter path then
-        result := result.push path
-  return result
-
-def stripDotSlash (s : String) : String :=
-  if s.startsWith "./" then s.drop 2 |>.toString else s
-
-def findByExtension (ext : String) : IO (Array String) := do
-  let res ← findRec "." fun p => p.extension == some ext
-  let mut arr := res.map (fun p => stripDotSlash p.toString)
-  return arr.qsort (· < ·)
-
-def findByExtensions (exts : Array String) : IO (Array String) := do
-  let res ← findRec "." fun p => match p.extension with
-    | some e => exts.contains e
-    | none => false
-  let mut arr := res.map (fun p => stripDotSlash p.toString)
-  return arr.qsort (· < ·)
-
-partial def findDirsRec (dir : FilePath) : IO (Array FilePath) := do
-  let mut result := #[]
-  let entries ← dir.readDir
-  for entry in entries do
-    let path := entry.path
-    let md ← path.metadata
-    if md.type == FileType.dir then
-      result := result.push path
-      let sub ← findDirsRec path
-      result := result ++ sub
-  return result
-
-def findDirectories : IO (Array String) := do
-  let res ← findDirsRec "."
-  let mut arr := res.map (fun p => stripDotSlash p.toString ++ "/")
-  return arr.qsort (· < ·)
-
-
-def assertGlob (pattern : NonEmptyList PatternSegmentNonWF) (expected : Array String) : IO Unit := do
-  IO.println s!"assertGlob {pattern} {expected} - not implemented"
-
-def assertGlobMany (patterns : NonEmptyList (NonEmptyList PatternSegmentNonWF)) (expected : Array String) : IO Unit := do
-  IO.println s!"assertGlobMany {patterns} {expected} - not implemented"
 
 def runGlobRealTests : IO Unit := do
   runTests #[
@@ -77,9 +28,9 @@ def runGlobRealTests : IO Unit := do
       createDir "subdir/another_subdir"
       writeFile "subdir/another_subdir/bar.txt" "content"
       writeFile "subdir/another_subdir/foo.txt" "content"
-      assertGlob ![PatternSegmentNonWF.doubleStar, PatternSegmentNonWF.lit (nes!"foo.txt")] #["foo.txt", "subdir/foo.txt", "subdir/another_subdir/foo.txt"]
-      assertGlob ![PatternSegmentNonWF.lit (nes!"foo.txt")] #["foo.txt"]
-      assertGlob ![PatternSegmentNonWF.oneStar, PatternSegmentNonWF.lit (nes!"foo.txt")] #["subdir/foo.txt"]
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "**/foo.txt") ![PatternSegmentNonWF.doubleStar, PatternSegmentNonWF.lit (nes!"foo.txt")]) #["foo.txt", "subdir/foo.txt", "subdir/another_subdir/foo.txt"]
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "foo.txt") ![PatternSegmentNonWF.lit (nes!"foo.txt")]) #["foo.txt"]
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "*/foo.txt") ![PatternSegmentNonWF.oneStar, PatternSegmentNonWF.lit (nes!"foo.txt")]) #["subdir/foo.txt"]
     ),
     ("BasicWildcard", withinTempDir do
       writeFile "file1.txt" "content"
@@ -89,21 +40,18 @@ def runGlobRealTests : IO Unit := do
       writeFile "subdir/file3.txt" "content"
       createDir "empty_dir"
 
-      assertGlob ![PatternSegmentNonWF.oneStar] #["empty_dir", "file1.txt", "file2.txt", "image.png", "subdir"]),
-    -- ("QuestionMark", do
-    --   let _tmpDir ← IO.currentDir
-    --   writeFile "doc1" "content"
-    --   writeFile "doc2" "content"
-    --   writeFile "doc_long" "content"
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "*") ![PatternSegmentNonWF.oneStar]) #["empty_dir", "file1.txt", "file2.txt", "image.png", "subdir"]),
+    ("QuestionMark", withinTempDir do
+      writeFile "doc1" "content"
+      writeFile "doc2" "content"
+      writeFile "doc_long" "content"
 
-    --   let results ← glob "doc?"
-    --   assertEq "Question mark doc?" #["doc1", "doc2"] results),
-    -- ("CharacterClass", do
-    --   let _tmpDir ← IO.currentDir
-    --   writeFile "apple" "content"
-    --   writeFile "apricot" "content"
-    --   writeFile "banana" "content"
-    --   assertEq "Character class a[p-r]*" #["apple", "apricot"] (← glob "a[p-r]*")),
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "doc?") ![PatternSegmentNonWF.regex (Regex.parse! "^doc.$")]) #["doc1", "doc2"]),
+    ("CharacterClass", withinTempDir do
+      writeFile "apple" "content"
+      writeFile "apricot" "content"
+      writeFile "banana" "content"
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "a[p-r]*") ![PatternSegmentNonWF.regex (Regex.parse! "^a[p-r].*$")]) #["apple", "apricot"]),
     -- ("GlobWithDirMark", do
     --   let _tmpDir ← IO.currentDir
     --   writeFile "file.txt" "content"
@@ -134,13 +82,12 @@ def runGlobRealTests : IO Unit := do
       assertGlobMany ![![PatternSegmentNonWF.lit (nes!"file.txt")], ![PatternSegmentNonWF.lit (nes!"doc.md")], ![PatternSegmentNonWF.lit (nes!"data.csv")]] #["data.csv", "doc.md", "file.txt"]
       assertGlobMany ![![PatternSegmentNonWF.lit (nes!"nonexistent.xyz")], ![PatternSegmentNonWF.lit (nes!"file.txt")]] #["file.txt"]
       assertGlobMany ![![PatternSegmentNonWF.lit (nes!"nonexistent.xyz")], ![PatternSegmentNonWF.lit (nes!"nonexistent.abc")]] #[]),
-    -- ("GlobWithBraces", do
-    --   let _tmpDir ← IO.currentDir
-    --   writeFile "config.json" "content"
-    --   writeFile "config.yaml" "content"
-    --   writeFile "config.txt" "content"
-    --   writeFile "data.json" "content"
-    --   assertEq "globWithBraces config.{json,yaml}" #["config.json", "config.yaml"] (← globWithBraces "config.{json,yaml}")),
+    ("GlobWithBraces", withinTempDir do
+      writeFile "config.json" "content"
+      writeFile "config.yaml" "content"
+      writeFile "config.txt" "content"
+      writeFile "data.json" "content"
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "config.{json,yaml}") ![PatternSegmentNonWF.regex (Regex.parse! "^config\\.(json|yaml)$")]) #["config.json", "config.yaml"]),
     -- ("GlobWithTilde", do
     --   let _tmpDir ← IO.currentDir
     --   -- Tilde expansion is highly environment-dependent. This test primarily checks
@@ -188,7 +135,7 @@ def runGlobRealTests : IO Unit := do
       writeFile (tmpDir / "dir1" / "nested.txt") "content"
       assertEq "findDirectories" #["dir1/", "dir2/"] (← findDirectories)),
     ("NoMatchesWithoutNoCheck", withinTempDir do
-      assertGlob ![PatternSegmentNonWF.lit (nes!"nonexistent.txt")] #[]),
+      assertGlob (assertAreEqualAndReturnFirst (patternStrict "nonexistent.txt") ![PatternSegmentNonWF.lit (nes!"nonexistent.txt")]) #[]),
     -- ("TestErrFlag", do
     --   let tmpDir ← IO.currentDir
     --   -- This test remains limited due to portability of permissions.

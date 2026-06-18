@@ -10,10 +10,11 @@ elab "patternNonWFLax" pat:str : term => return Lean.toExpr (PatternNonWF'.fromS
 elab "patternNonWFStrict" pat:str : term => do
   let s := pat.getString
   match PatternNonWF.fromStringStrict s with
-  | some (p : NonEmptyList PatternSegmentNonWF) => return (Lean.toExpr p)
-  | none => throwError s!"invalid non-well-formed pattern: {s}"
+  | .ok (p : NonEmptyList PatternSegmentNonWF) => return (Lean.toExpr p)
+  | .error .emptySegment => throwError s!"invalid non-well-formed pattern: {s}"
+  | .error (.invalidRegex _) => throwError s!"invalid regex in pattern: {s}"
 
 #guard ![PatternSegmentNonWF.oneStar] = ![PatternSegmentNonWF.oneStar]
-#guard PatternNonWF.fromStringStrict "*" = .some (![PatternSegmentNonWF.oneStar])
+#guard (PatternNonWF.fromStringStrict "*").toOption = some (![PatternSegmentNonWF.oneStar])
 #guard patternNonWFLax "*" = [PatternSegmentNonWF.oneStar]
 #guard patternNonWFStrict "*" = ![PatternSegmentNonWF.oneStar]

@@ -49,7 +49,3 @@ roots = ["Pathy"]
 [[lean_exe]]
 name = "test"
 root = "GlobTest.Main"
-
-[[lean_lib]]
-name = "FileFinder"
-roots = ["FileFinder"]

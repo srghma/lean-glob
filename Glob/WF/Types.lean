@@ -17,13 +17,9 @@ open NonEmpty.String NonEmpty.List
 
 -- Well-formedness rules as predicates
 def canFollow : PatternSegmentNonWF → PatternSegmentNonWF → Prop
-  | _, .lit _ => True
-  | .lit _, .oneStar => True
-  | .lit _, .doubleStar => True
   | .doubleStar, .doubleStar => False
   | .doubleStar, .oneStar => False
-  | .oneStar, .doubleStar => True
-  | .oneStar, .oneStar => True
+  | _, _ => True
 
 def isValidSequence : List PatternSegmentNonWF → Prop
   | [] => False
@@ -32,13 +28,13 @@ def isValidSequence : List PatternSegmentNonWF → Prop
 
 def canFollowDecidable (prev next : PatternSegmentNonWF) : Decidable (canFollow prev next) :=
   match prev, next with
-  | _, .lit _ => isTrue (by simp [canFollow])
-  | .lit _, .oneStar => isTrue (by simp [canFollow])
-  | .lit _, .doubleStar => isTrue (by simp [canFollow])
   | .doubleStar, .doubleStar => isFalse (by simp [canFollow])
   | .doubleStar, .oneStar => isFalse (by simp [canFollow])
-  | .oneStar, .doubleStar => isTrue (by simp [canFollow])
-  | .oneStar, .oneStar => isTrue (by simp [canFollow])
+  | .doubleStar, .lit _ => isTrue (by simp [canFollow])
+  | .doubleStar, .regex _ => isTrue (by simp [canFollow])
+  | .oneStar, _ => isTrue (by cases next <;> simp [canFollow])
+  | .lit _, _ => isTrue (by cases next <;> simp [canFollow])
+  | .regex _, _ => isTrue (by cases next <;> simp [canFollow])
 
 instance isValidSequenceDecidable : (segments : List PatternSegmentNonWF) → Decidable (isValidSequence segments)
   | [] => isFalse (by simp [isValidSequence])
@@ -54,7 +50,10 @@ instance isValidSequenceDecidable : (segments : List PatternSegmentNonWF) → De
 structure PatternValidated : Type where
   pattern : List PatternSegmentNonWF
   valid_sequence : isValidSequence pattern
-  deriving Repr, Ord, Hashable, DecidableEq
+  deriving Repr
+instance : BEq PatternValidated where
+  beq a b := a.pattern == b.pattern
+
 
 instance : Inhabited PatternValidated where
   default := ⟨[.oneStar], by simp [isValidSequence]⟩
@@ -77,7 +76,10 @@ instance : ToExpr PatternValidated where
 inductive PatternValidatedError where
   | invalidEmpty : PatternValidatedError
   | invalidWrongOrdering : PatternValidatedError
-  deriving Repr, Ord, Hashable, DecidableEq
+  deriving Repr
+instance : BEq PatternValidated where
+  beq a b := a.pattern == b.pattern
+
 
 def PatternValidatedError.toHumanReadable : PatternValidatedError → String
   | .invalidEmpty => "Pattern cannot be empty."
@@ -127,11 +129,11 @@ def PatternValidated.mk? (segments : List PatternSegmentNonWF) : Except PatternV
 
 def PatternValidated.patternStrict? (str : String) : Except String PatternValidated :=
   match PatternNonWF'.fromStringStrict str with
-  | .none => throw "Did some segment was empty? `foo//bar` should be `foo/bar`"
-  | .some pat => match (PatternValidated.mk? pat) with
+  | .error .emptySegment => throw "Did some segment was empty? `foo//bar` should be `foo/bar`"
+  | .error (.invalidRegex _) => throw "Regex syntax error in pattern"
+  | .ok pat => match (PatternValidated.mk? pat) with
     | .error .invalidEmpty => throw PatternValidatedError.invalidEmpty.toHumanReadable
-    | .error .invalidWrongOrdering => throw (s!"Probably You wanted to write {PatternNonWF'.toString $ normalizeSegments pat}
-{PatternValidatedError.invalidWrongOrdering.toHumanReadable}")
+    | .error .invalidWrongOrdering => throw (s!"Probably You wanted to write {PatternNonWF'.toString $ normalizeSegments pat}\n{PatternValidatedError.invalidWrongOrdering.toHumanReadable}")
     | .ok pat => return pat
 
 def PatternValidated.patternStrictIO! (str : String) : IO PatternValidated := do
