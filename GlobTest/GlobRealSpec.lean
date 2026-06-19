@@ -96,19 +96,12 @@ def globRealSpec : Spec := do
     --   else
     --     assertIsNotEmpty "globWithTilde ~/" results
 
-    -- it "GlobDirsOnly" do withinTempDir fun tmpDir => do
-    --   let tmpDir ← IO.currentDir
-    --   writeFile (tmpDir / "file.txt") "content"
-    --   createDir (tmpDir / "dir1")
-    --   createDir (tmpDir / "dir2")
-    --   writeFile (tmpDir / "dir1" / "nested_file.txt") "content"
-    --   assertEq "globDirsOnly *" #["dir1/", "dir2/"] (← globDirsOnly "*")
-
-    -- it "GlobSafe" do withinTempDir fun tmpDir => do
-    --   writeFile (tmpDir / "present.txt") "content"
-    --   assertEq "globSafe (match)" #["present.txt"] (← globSafe "*.txt")
-    --   assertEq "globSafe (no match, nocheck)" #["nonexistent.*"] (← globSafe "nonexistent.*")
-    --   assertEq "globSafe (literal no match, nocheck)" #["definitely_not_here.md"] (← globSafe "definitely_not_here.md")
+    it "GlobDirsOnly" do withinTempDir fun tmpDir => do
+      writeFile (tmpDir / "file.txt") "content"
+      createDir (tmpDir / "dir1")
+      createDir (tmpDir / "dir2")
+      writeFile (tmpDir / "dir1" / "nested_file.txt") "content"
+      assertEq "globDirsOnly *" #["dir1/", "dir2/"] (← globDirsOnly tmpDir (assertAreEqualAndReturnFirst (patternStrict "*") ![PatternSegmentNonWF.oneStar]))
 
     it "FindByExtension" do withinTempDir fun tmpDir => do
       writeFile (tmpDir / "a.lean") "content"
@@ -135,13 +128,21 @@ def globRealSpec : Spec := do
     it "NoMatchesWithoutNoCheck" do withinTempDir fun tmpDir => do
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "nonexistent.txt") ![PatternSegmentNonWF.lit (nes!"nonexistent.txt")]) #[]
 
-    -- it "TestErrFlag" do withinTempDir fun tmpDir => do
-    --   let tmpDir ← IO.currentDir
-    --   -- This test remains limited due to portability of permissions.
-    --   -- It primarily ensures the flag passes and doesn't crash the FFI.
-    --   let restrictedDir := tmpDir / "restricted"
-    --   createDir restrictedDir
-    --   -- One *could* attempt `IO.Process.runCommand` for `chmod` but it's not portable
-    --   -- across OSes or always reliable for testing specific error conditions.
-    --   let results ← glob (restrictedDir / "*").toString { GlobFlags.default with err := true }
-    --   IO.println s!"TestErrFlag: Results: {results}"
+    if !System.Platform.isWindows then
+      it "TestRestrictedFolder" do withinTempDir fun tmpDir => do
+        let restrictedDir := tmpDir / "restricted"
+        createDir restrictedDir
+        writeFile (restrictedDir / "hidden.txt") "secret"
+
+        let chmodRes ← try
+          let _ ← IO.Process.run { cmd := "chmod", args := #["000", restrictedDir.toString] }
+          pure true
+        catch _ => pure false
+
+        if chmodRes then
+          try
+            let results ← globFS tmpDir (assertAreEqualAndReturnFirst (patternStrict "restricted/*") ![PatternSegmentNonWF.lit (nes!"restricted"), PatternSegmentNonWF.oneStar])
+            assertEq "globFS on restricted" #[] results
+          finally
+            -- Restore permissions so cleanup works
+            let _ ← try IO.Process.run { cmd := "chmod", args := #["755", restrictedDir.toString] } catch _ => pure ""

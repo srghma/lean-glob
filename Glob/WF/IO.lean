@@ -138,4 +138,16 @@ def findDirectories (initDir : FilePath) : IO (Array String) := do
       matched := matched.push (ToString.toString relativePath ++ "/")
   return matched.qsort (· < ·)
 
+def globDirsOnly (initDir : FilePath) (pattern : PatternValidated) : IO (Array String) := do
+  let rootDir := initDir.toString
+  let mut matched := #[]
+  for (path, md) in ({ root := initDir : DirWalker }) do
+    if md.type == FileType.dir then
+      let relativePath := stripDirPrefix rootDir path.toString
+      let pathSegments := (relativePath.split (· == '/')).filter (!·.isEmpty) |>.toList
+      -- IO.println s!"path: {path}, relativePath: {relativePath.toString}, pathSegments: {pathSegments.map (·.toString)}"
+      if matchSegments pattern.pattern pathSegments then
+        matched := matched.push (ToString.toString relativePath ++ "/")
+  return matched.qsort (· < ·)
+
 end
