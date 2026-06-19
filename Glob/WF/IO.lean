@@ -22,14 +22,14 @@ open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 
-def stripDirPrefix (dir : String) (path : String) : String :=
+def stripDirPrefix (dir : String) (path : String) : Substring.Raw :=
   let dirWithSlash := if dir.endsWith "/" then dir else dir ++ "/"
   if path.startsWith dirWithSlash then
-    (path.drop dirWithSlash.length).toString
+    path.toRawSubstring.drop dirWithSlash.length
   else
-    path
+    path.toRawSubstring
 
-partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List String) : Bool :=
+partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List Substring.Raw) : Bool :=
   match pattern, path with
   | [], [] => true
   | [], _ => false
@@ -38,7 +38,7 @@ partial def matchSegments (pattern : List PatternSegmentNonWF) (path : List Stri
   | PatternSegmentNonWF.doubleStar :: ps, x :: xs =>
       matchSegments ps (x :: xs) || matchSegments (PatternSegmentNonWF.doubleStar :: ps) xs
   | p :: ps, x :: xs =>
-      p.matchS x && matchSegments ps xs
+      p.matchRawSub x && matchSegments ps xs
 
 structure DirWalker where
   root : System.FilePath
@@ -52,7 +52,7 @@ partial def DirWalker.forInRec {β : Type} (w : DirWalker) (current : System.Fil
       let path := entry.path
       let md ← path.metadata
       let isDir := md.type == FileType.dir
-      
+
       -- If the user wants to prune this directory BEFORE visiting it, we can do it here.
       -- But standard `os.walk` visits the directory, THEN you prune.
       -- Let's just visit it:
@@ -80,19 +80,19 @@ def globFS (initDir : FilePath) (pattern : PatternValidated) : IO (Array String)
   let mut matched := #[]
   for (path, _) in ({ root := initDir : DirWalker }) do
     let relativePath := stripDirPrefix rootDir path.toString
-    let pathSegments := (relativePath.splitOn "/").filter (· ≠ "")
+    let pathSegments := (relativePath.splitOn "/").filter (!·.isEmpty)
     if matchSegments pattern.pattern pathSegments then
-      matched := matched.push relativePath
+      matched := matched.push relativePath.toString
   return matched.qsort (· < ·)
 
 def globWithDirMark (initDir : FilePath) (pattern : PatternValidated) : IO (Array String) := do
   let rootDir := initDir.toString
   let mut matched := #[]
   for (path, md) in ({ root := initDir : DirWalker }) do
-    let mut relativePath := stripDirPrefix rootDir path.toString
+    let mut relativePath := (stripDirPrefix rootDir path.toString).toString
     if md.type == FileType.dir && !relativePath.endsWith "/" then
       relativePath := relativePath ++ "/"
-    let pathSegments := (relativePath.splitOn "/").filter (· ≠ "")
+    let pathSegments := (relativePath.toRawSubstring.splitOn "/").filter (!·.isEmpty)
     if matchSegments pattern.pattern pathSegments then
       matched := matched.push relativePath
   return matched.qsort (· < ·)
@@ -101,7 +101,7 @@ def checkPattern (initDir : FilePath) (pattern : PatternValidated) : IO Bool := 
   let rootDir := initDir.toString
   for (path, _) in ({ root := initDir : DirWalker }) do
     let relativePath := stripDirPrefix rootDir path.toString
-    let pathSegments := (relativePath.splitOn "/").filter (· ≠ "")
+    let pathSegments := (relativePath.splitOn "/").filter (!·.isEmpty)
     if matchSegments pattern.pattern pathSegments then
       return true
   return false
@@ -113,7 +113,7 @@ def findByExtension (initDir : FilePath) (ext : String) : IO (Array String) := d
     if md.type != FileType.dir then
       if path.extension == some ext then
         let relativePath := stripDirPrefix rootDir path.toString
-        matched := matched.push relativePath
+        matched := matched.push relativePath.toString
   return matched.qsort (· < ·)
 
 def findByExtensions (initDir : FilePath) (exts : Array String) : IO (Array String) := do
@@ -125,7 +125,7 @@ def findByExtensions (initDir : FilePath) (exts : Array String) : IO (Array Stri
       | some e =>
         if exts.contains e then
           let relativePath := stripDirPrefix rootDir path.toString
-          matched := matched.push relativePath
+          matched := matched.push relativePath.toString
       | none => pure ()
   return matched.qsort (· < ·)
 
@@ -135,7 +135,7 @@ def findDirectories (initDir : FilePath) : IO (Array String) := do
   for (path, md) in ({ root := initDir : DirWalker }) do
     if md.type == FileType.dir then
       let relativePath := stripDirPrefix rootDir path.toString
-      matched := matched.push (relativePath ++ "/")
+      matched := matched.push (relativePath.toString ++ "/")
   return matched.qsort (· < ·)
 
 end
