@@ -31,6 +31,13 @@ elab "patternStrict" pat:str : term => do
   | .error e => throwError e
   | .ok pat => return (Lean.toExpr pat)
 
+elab "patternStrictWithEnvVars" pat:str : term => do
+  match PatternValidated.patternStrictWithEnvVars? pat.getString with
+  | .error e => throwError e
+  | .ok _ =>
+    let stx ← `(PatternValidated.patternStrictWithEnvVars_unchecked $pat)
+    Lean.Elab.Term.elabTerm stx none
+
 /--
 info: Pattern cannot be empty.
 -/

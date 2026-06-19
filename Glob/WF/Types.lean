@@ -136,8 +136,82 @@ def PatternValidated.patternStrict? (str : String) : Except String PatternValida
     | .error .invalidWrongOrdering => throw (s!"Probably You wanted to write {PatternNonWF'.toString $ normalizeSegments pat}\n{PatternValidatedError.invalidWrongOrdering.toHumanReadable}")
     | .ok pat => return pat
 
+def parseVarName (l : List Char) (acc : String) : (String × Bool × Bool × List Char) :=
+  match l with
+  | '}' :: rest2 => (acc, false, true, rest2)
+  | '?' :: '}' :: rest2 => (acc, true, true, rest2)
+  | c :: rest2 => parseVarName rest2 (acc.push c)
+  | [] => (acc, false, false, [])
+
+partial def checkEnvAndTildeSyntax.loop (chars : List Char) (changed : Bool) : Except String Bool :=
+  match chars with
+  | [] => pure changed
+  | '$' :: '{' :: rest =>
+    let (varName, _, closed, remaining) := parseVarName rest ""
+    if !closed then
+      throw ("Unclosed environment variable syntax: ${" ++ varName)
+    else
+      checkEnvAndTildeSyntax.loop remaining true
+  | _ :: rest => checkEnvAndTildeSyntax.loop rest changed
+
+def checkEnvAndTildeSyntax (chars : List Char) : Except String Bool :=
+  match chars with
+  | '~' :: '/' :: rest => checkEnvAndTildeSyntax.loop ('/' :: rest) true
+  | ['~'] => pure true
+  | chars => checkEnvAndTildeSyntax.loop chars false
+
+partial def expandEnvAndTilde.loop (chars : List Char) (result : String) (changed : Bool) : IO (String × Bool) := do
+  match chars with
+  | [] => pure (result, changed)
+  | '$' :: '{' :: rest =>
+    let (varName, isOptional, closed, remaining) := parseVarName rest ""
+        
+    if !closed then
+      throw (IO.userError ("Unclosed environment variable syntax: ${" ++ varName))
+      
+    let val? ← IO.getEnv varName
+    match val? with
+    | some val => 
+      expandEnvAndTilde.loop remaining (result ++ val) true
+    | none =>
+      if isOptional then
+        expandEnvAndTilde.loop remaining result true
+      else
+        throw (IO.userError ("Environment variable not set: " ++ varName))
+  | c :: rest =>
+    expandEnvAndTilde.loop rest (result.push c) changed
+
+def expandEnvAndTilde (s : String) : IO (String × Bool) := do
+  match s.toList with
+  | '~' :: '/' :: rest =>
+    let some home ← IO.getEnv "HOME" | throw (IO.userError "HOME environment variable is not set")
+    expandEnvAndTilde.loop ('/' :: rest) home true
+  | ['~'] =>
+    let some home ← IO.getEnv "HOME" | throw (IO.userError "HOME environment variable is not set")
+    pure (home, true)
+  | chars => expandEnvAndTilde.loop chars "" false
+
+def PatternValidated.patternStrictWithEnvVars_unchecked (str : String) : IO PatternValidated := do
+  let (expandedStr, _) ← expandEnvAndTilde str
+  let expandedRel : String := if expandedStr.startsWith "/" then (expandedStr.drop 1).toString else expandedStr
+  match PatternValidated.patternStrict? expandedRel with
+  | .ok pat => pure pat
+  | .error err => throw <| IO.userError err
+
+def PatternValidated.patternStrictWithEnvVars? (str : String) : Except String (IO PatternValidated) := do
+  let changed ← checkEnvAndTildeSyntax str.toList
+  if !changed then
+    throw "Use patternStrict instead of patternStrictWithEnvVars for pure patterns without environment variables or tilde."
+  pure (PatternValidated.patternStrictWithEnvVars_unchecked str)
+
+def PatternValidated.patternStrictWithEnvVars! (str : String) : IO (IO PatternValidated) := do
+  match PatternValidated.patternStrictWithEnvVars? str with
+  | .ok ioPat => pure ioPat
+  | .error err => throw <| IO.userError err
+
 def PatternValidated.patternStrictIO! (str : String) : IO PatternValidated := do
   match PatternValidated.patternStrict? str with
   | .ok  pat => pure pat
   | .error err => throw <| IO.userError err
+
 end
