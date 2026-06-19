@@ -140,14 +140,14 @@ def PatternSegmentNonWF.matchS (seg : PatternSegmentNonWF) (name : String) : Boo
   | none => false
   | some name' => PatternSegmentNonWF.matchNES seg name'
 
-def PatternSegmentNonWF.matchRawSub (seg : PatternSegmentNonWF) (name : Substring.Raw) : Bool :=
-  if name.bsize == 0 then false
+def PatternSegmentNonWF.matchSlice (seg : PatternSegmentNonWF) (name : String.Slice) : Bool :=
+  if name.isEmpty then false
   else
     match seg with
-    | .lit s => s.toString.toRawSubstring == name
+    | .lit s => s.toString.toSlice == name
     | .oneStar => true
     | .doubleStar => false
-    | .regex re => re.test name.toString
+    | .regex re => re.test (ToString.toString name)
 
 open Lean Meta
 
