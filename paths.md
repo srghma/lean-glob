@@ -20,14 +20,20 @@ Linux and other Unix-like systems use forward slashes (`/`) as path separators, 
 
 Windows systems typically use backslashes (`\`) as path separators, are case-insensitive, and use drive letters (like `C:`, `D:`) to represent different storage volumes.
 
-| Path Type | Target | Example Path | Description |
-| :--- | :--- | :--- | :--- |
-| **Absolute** | **File** | `C:\Windows\System32\cmd.exe` | Points directly to the Command Prompt executable on the C: drive. |
-| **Absolute** | **File** | `D:\Users\John\Documents\budget.xlsx` | Points to an Excel sheet in a user directory on the D: drive. |
-| **Absolute** | **Directory** | `C:\Program Files\Java` | Points to the Java installation directory on the C: drive. |
-| **Absolute** | **Directory** | `\\Server01\Shared\Reports` | A UNC (Universal Naming Convention) absolute path pointing to a shared network directory. |
-| **Relative** | **File** | `settings.ini` | Points to an initialization file in the current working directory. |
-| **Relative** | **File** | `.\config\database.db` | Points to a database file inside the `config` folder of the current directory. |
-| **Relative** | **File** | `..\src\main.py` | Goes up to the parent directory, then into the `src` folder to find the script. |
-| **Relative** | **Directory** | `assets\images` | Points to a directory relative to the current working directory. |
-| **Relative** | **Directory** | `..` | Points to the parent directory of the current working directory. |
+| Path Type | Target | Example Path |
+| :--- | :--- | :--- |
+| **Absolute** | **File** | `C:\Windows\System32\cmd.exe` |
+| **Absolute** | **Directory** | `C:\Program Files\Java` |
+| **Absolute (Mixed)** | **File** | `C:\Windows/System32\cmd.exe` |
+| **Absolute (Forward)** | **Directory** | `C:/Program Files/Java` |
+| **Absolute (UNC)** | **Directory** | `\\Server01\Shared\Reports` |
+| **Absolute (Verbatim Disk)** | **File** | `\\?\C:\VeryLongPath\file.txt` |
+| **Absolute (Verbatim UNC)** | **File** | `\\?\UNC\Server01\Shared\file.txt` |
+| **Relative** | **File** | `settings.ini` |
+| **Relative** | **File** | `.\config\database.db` |
+| **Relative (Mixed)** | **File** | `.\config/database.db` |
+| **Relative** | **File** | `..\src\main.py` |
+| **Relative (Current Drive)** | **Directory** | `\Users\John\Documents` |
+| **Relative (Drive-Relative)** | **File** | `D:Documents\budget.xlsx` |
+| **Relative** | **Directory** | `assets\images` |
+| **Relative** | **Directory** | `..` |
