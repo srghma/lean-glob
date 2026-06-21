@@ -1,3 +1,7 @@
+module
+
+@[expose] public section
+
 /-!
 # Shared path-parsing helpers
 

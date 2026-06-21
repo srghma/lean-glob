@@ -43,6 +43,10 @@ name = "TypedPath"
 roots = ["TypedPath"]
 
 [[lean_lib]]
+name = "TypedPathTests"
+roots = ["TypedPathTests"]
+
+[[lean_lib]]
 name = "GlobTest"
 roots = ["GlobTest"]
 
@@ -53,3 +57,11 @@ roots = ["Pathy"]
 [[lean_exe]]
 name = "test"
 root = "GlobTest.Main"
+
+[[lean_lib]]
+name = "TypedGlob"
+roots = ["TypedGlob"]
+
+[[lean_lib]]
+name = "TypedGlobTest"
+roots = ["TypedGlobTest"]
