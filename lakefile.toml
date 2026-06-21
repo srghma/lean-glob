@@ -39,6 +39,10 @@ name = "Glob"
 roots = ["Glob"]
 
 [[lean_lib]]
+name = "TypedPath"
+roots = ["TypedPath"]
+
+[[lean_lib]]
 name = "GlobTest"
 roots = ["GlobTest"]
 
