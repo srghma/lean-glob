@@ -63,17 +63,21 @@ structure ValidDriveChar where
   is_upper_az : 'A' ≤ toChar ∧ toChar ≤ 'Z' := by decide
 deriving DecidableEq
 
+namespace ValidDriveChar
+
 /-- Smart constructor: upper-cases `c`, then checks it lands in `'A'..'Z'`. -/
-def ValidDriveChar.mk? (c : Char) : Option ValidDriveChar :=
+def mk? (c : Char) : Option ValidDriveChar :=
   let u := c.toUpper
   if h : 'A' ≤ u ∧ u ≤ 'Z' then some ⟨u, h⟩ else none
 
 instance : Inhabited ValidDriveChar := ⟨{ toChar := 'A' }⟩
 
-def ValidDriveChar.mk! (c : Char) : ValidDriveChar :=
-  match ValidDriveChar.mk? c with
+def mk! (c : Char) : ValidDriveChar :=
+  match mk? c with
   | some v => v
   | none => panic! s!"Invalid drive char: {c}"
+
+end ValidDriveChar
 
 macro "utf16Length_decide" : tactic => `(tactic| (simp only [String.utf16Length_eq, Char.utf16Size_eq]; decide))
 
@@ -85,22 +89,24 @@ deriving DecidableEq
 
 instance : ToString ValidComponent := ⟨(·.toString)⟩
 
-def ValidComponent.mk? (s : String) : Option ValidComponent :=
-  if h1 : s ≠ "" then
-    if h2 : s.utf16Length ≤ SEGMENT_MAX then
-      some { toString := s, isNonEmpty := h1, len_le := h2 }
-    else none
+namespace ValidComponent
+
+def mk? (s : String) : Option ValidComponent :=
+  if h : s ≠ "" ∧ s.utf16Length ≤ SEGMENT_MAX then
+    some { toString := s, isNonEmpty := h.1, len_le := h.2 }
   else none
 
 instance : Inhabited ValidComponent := ⟨{ toString := "Inhabited ValidComponent" }⟩
 
-def ValidComponent.mk! (s : String) : ValidComponent :=
-  match ValidComponent.mk? s with
+def mk! (s : String) : ValidComponent :=
+  match mk? s with
   | some v => v
   | none => panic! s!"Invalid component: {s}"
 
-theorem ValidComponent.utf16Length_le (c : ValidComponent) :
+theorem utf16Length_le (c : ValidComponent) :
     c.toString.utf16Length ≤ SEGMENT_MAX := c.len_le
+
+end ValidComponent
 
 /-- A validated Windows UNC server name.
     Must be non-empty and at most `255` UTF-16 code units long. -/
@@ -110,22 +116,24 @@ deriving DecidableEq
 
 instance : ToString ValidServer := ⟨(·.toString)⟩
 
-def ValidServer.mk? (s : String) : Option ValidServer :=
-  if h1 : s ≠ "" then
-    if h2 : s.utf16Length ≤ SERVER_MAX then
-      some { toString := s, isNonEmpty := h1, len_le := h2 }
-    else none
+namespace ValidServer
+
+def mk? (s : String) : Option ValidServer :=
+  if h : s ≠ "" ∧ s.utf16Length ≤ SERVER_MAX then
+    some { toString := s, isNonEmpty := h.1, len_le := h.2 }
   else none
 
 instance : Inhabited ValidServer := ⟨{ toString := "Inhabited ValidServer" }⟩
 
-def ValidServer.mk! (s : String) : ValidServer :=
-  match ValidServer.mk? s with
+def mk! (s : String) : ValidServer :=
+  match mk? s with
   | some v => v
   | none => panic! s!"Invalid server: {s}"
 
-theorem ValidServer.utf16Length_le (s : ValidServer) :
+theorem utf16Length_le (s : ValidServer) :
     s.toString.utf16Length ≤ SERVER_MAX := s.len_le
+
+end ValidServer
 
 /-- A validated Windows SMB share name.
     Must be non-empty and at most `80` UTF-16 code units long. -/
@@ -135,22 +143,24 @@ deriving DecidableEq
 
 instance : ToString ValidShare := ⟨(·.toString)⟩
 
-def ValidShare.mk? (s : String) : Option ValidShare :=
-  if h1 : s ≠ "" then
-    if h2 : s.utf16Length ≤ SHARE_MAX then
-      some { toString := s, isNonEmpty := h1, len_le := h2 }
-    else none
+namespace ValidShare
+
+def mk? (s : String) : Option ValidShare :=
+  if h : s ≠ "" ∧ s.utf16Length ≤ SHARE_MAX then
+    some { toString := s, isNonEmpty := h.1, len_le := h.2 }
   else none
 
 instance : Inhabited ValidShare := ⟨{ toString := "Inhabited ValidShare" }⟩
 
-def ValidShare.mk! (s : String) : ValidShare :=
-  match ValidShare.mk? s with
+def mk! (s : String) : ValidShare :=
+  match mk? s with
   | some v => v
   | none => panic! s!"Invalid share: {s}"
 
-theorem ValidShare.utf16Length_le (s : ValidShare) :
+theorem utf16Length_le (s : ValidShare) :
     s.toString.utf16Length ≤ SHARE_MAX := s.len_le
+
+end ValidShare
 
 inductive PathComponent where
   | current

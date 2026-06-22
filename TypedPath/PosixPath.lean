@@ -1,6 +1,8 @@
 module
 public import NonEmpty.String
+public import NonEmpty.ListCorrectByConstruction
 public import TypedPath.PathCommon
+import Aesop
 
 @[expose] public section
 
@@ -18,7 +20,7 @@ Two length limits matter on Linux:
   terminating `NUL` byte).
 
 Both limits below are baked into the *types*: you cannot construct a
-`Posix.ValidComponent` or a `Posix.ValidPath` that violates them, because the
+`Posix.PosixNormalComponent` or a `Posix.ValidPath` that violates them, because the
 only way to build one is through a smart constructor that checks the bound
 and hands back the resulting `Nat`-inequality as a proof obligation. Since
 every bound here is a concrete, decidable `Nat ≤`, that check is literally
@@ -26,112 +28,229 @@ just `Nat.decLe` doing the work — no hand-written proofs (and no `sorry`s)
 were actually needed.
 -/
 open NonEmpty.String
+open NonEmpty.ListCorrectByConstruction
 
 namespace Posix
 
 /-- `NAME_MAX`: maximum length of a single path component, in bytes. -/
-def NAME_MAX : Nat := 255
+def POSIX_NORMAL_COMPONENT_MAX : Nat := 255
 
 /-- `PATH_MAX`: maximum length of a whole path, in bytes of text. This is
     `4096 - 1`: the kernel's buffer size minus the terminating `NUL` byte
     that isn't part of the text itself. -/
-def PATH_MAX : Nat := 4095
+def POSIX_WHOLE_PATH_MAX : Nat := 4095
 
 /-- A path-component name that is non-empty and at most `NAME_MAX` bytes
     long. -/
-structure ValidComponent extends NonEmptyString where
-  len_le : toString.utf8ByteSize ≤ NAME_MAX := by decide
+structure PosixNormalComponent extends NonEmptyString where
+  len_le : toString.utf8ByteSize ≤ POSIX_NORMAL_COMPONENT_MAX := by decide
+  not_current : toString ≠ "." := by decide
+  not_parent : toString ≠ ".." := by decide
+  no_slash : toString.contains '/' = false :=
+    by simp_all only [↓Char.isValue, String.contains_char_eq, String.reduceToList, List.mem_cons, Char.reduceEq, List.not_mem_nil, or_self, decide_false]
 deriving DecidableEq
 
-instance : ToString ValidComponent := ⟨(·.toString)⟩
+instance : ToString PosixNormalComponent := ⟨(·.toString)⟩
+
+namespace PosixNormalComponent
 
 /-- Smart constructor: validates non-emptiness and the `NAME_MAX` bound. -/
-def ValidComponent.mk? (s : String) : Option ValidComponent :=
-  if h1 : s ≠ "" then
-    if h2 : s.utf8ByteSize ≤ NAME_MAX then
-      some { toString := s, isNonEmpty := h1, len_le := h2 }
-    else none
+def mk? (s : String) : Option PosixNormalComponent :=
+  if h : s ≠ "" ∧ s.utf8ByteSize ≤ POSIX_NORMAL_COMPONENT_MAX ∧ s ≠ "." ∧ s ≠ ".." ∧ s.contains '/' = false then
+    some {
+      toString := s
+      isNonEmpty := h.1
+      len_le := h.2.1
+      not_current := h.2.2.1
+      not_parent := h.2.2.2.1
+      no_slash := h.2.2.2.2
+    }
   else none
 
-instance : Inhabited ValidComponent := ⟨{ toString := "Inhabited ValidComponent" }⟩
+instance : Inhabited PosixNormalComponent := ⟨{ toString := "Inhabited PosixNormalComponent" }⟩
 
-def ValidComponent.mk! (s : String) : ValidComponent :=
-  match ValidComponent.mk? s with
+def mk! (s : String) : PosixNormalComponent :=
+  match mk? s with
   | some v => v
   | none => panic! s!"Invalid component: {s}"
 
-theorem ValidComponent.utf8ByteSize_le (c : ValidComponent) :
-    c.toString.utf8ByteSize ≤ NAME_MAX := c.len_le
+theorem utf8ByteSize_le (c : PosixNormalComponent) : c.toString.utf8ByteSize ≤ POSIX_NORMAL_COMPONENT_MAX := c.len_le
+
+end PosixNormalComponent
 
 /-- A single component of a POSIX path. -/
-inductive PathComponent where
-  | current                              -- "."
-  | parent                               -- ".."
-  | normal (name : ValidComponent)       -- a validated file/directory name
+inductive PosixComponent : Bool → Type where
+  | parent : PosixComponent true             -- ".."
+  | normal (name : PosixNormalComponent) : PosixComponent allowParents -- a validated file/directory name
 deriving DecidableEq
 
-def PathComponent.toString : PathComponent → String
-  | .current  => "."
-  | .parent   => ".."
-  | .normal n => n.toString
+def PosixComponent.toNonEmptyString : PosixComponent allowParents → NonEmptyString
+  | .parent   => ⟨"..", by decide⟩
+  | .normal n => n.toNonEmptyString
 
-instance : ToString PathComponent := ⟨PathComponent.toString⟩
+instance : ToString (PosixComponent allowParents) := ⟨(·.toNonEmptyString.toString)⟩
 
 /-- Parses a single path component. `.` and `..` are recognised specially
     (they're not subject to `NAME_MAX` — the kernel treats them as fixed
     pseudo-entries, not arbitrary names); anything else must satisfy
-    `ValidComponent`, otherwise the whole parse fails. -/
-def parsePathComponent (s : String) : Option PathComponent :=
-  if s == "." then some .current
-  else if s == ".." then some .parent
-  else (ValidComponent.mk? s).map .normal
+    `PosixNormalComponent`, otherwise the whole parse fails. -/
+def parsePathComponent : (allowParents : Bool) → String → Option (PosixComponent allowParents)
+  | true, ".." => some .parent
+  | _, s => (PosixNormalComponent.mk? s).map .normal
+
+def PosixPath.components_toNonEmptyString (pathType : PathType) (fileType : FileType) (components : NonEmptyList (PosixComponent allowParents)) : NonEmptyString :=
+  let base := intercalateListCBC "/" (components.map PosixComponent.toNonEmptyString)
+  let prefix_: String := match pathType with
+    | .Abs => "/"
+    | .Rel => ""
+  let suffix_: String := match fileType with
+    | .Dir => "/"
+    | .File => ""
+  prefix_ ++ base ++ suffix_
+
+def PosixPath.components_toString (pathType : PathType) (fileType : FileType) (components : NonEmptyList (PosixComponent allowParents)) : String :=
+  PosixPath.components_toNonEmptyString pathType fileType components |> NonEmptyString.toString
 
 /-- A POSIX path, before the whole-path `PATH_MAX` check. -/
-inductive PosixPath where
-  | absolute (components : List PathComponent)
-  | relative (components : List PathComponent)
+-- Absolute means IF true THEN means starts with / ELSE ./foo or foo will be parsed same but printed only to foo
+structure PosixPath (allowParents : Bool) (pathType : PathType) (fileType : FileType) where
+  components : NonEmptyList (PosixComponent allowParents)
+  size_le : (PosixPath.components_toString pathType fileType components).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX
 deriving DecidableEq
 
-def PosixPath.toString : PosixPath → String
-  | .absolute cs => "/" ++ String.intercalate "/" (cs.map PathComponent.toString)
-  | .relative cs => String.intercalate "/" (cs.map PathComponent.toString)
+instance : ToString (PosixPath allowParents pathType fileType) :=
+  ⟨fun p => PosixPath.components_toString pathType fileType p.components⟩
 
-instance : ToString PosixPath := ⟨PosixPath.toString⟩
+structure ExpectedPosixPath where
+  allowParents : Bool
+  pathType : PathType
+  fileType : FileType
+deriving BEq, Inhabited, DecidableEq
+
+inductive IfParentsNotAllowedButHaveParent where
+  | Throw
+  | Skip
+deriving BEq, Inhabited, DecidableEq, Repr
+
+inductive IfRequestedRelButStartsWithSlash where
+  | Throw
+  | DropSlash
+deriving BEq, Inhabited, DecidableEq, Repr
+
+inductive IfRequestedAbsButNoSlash where
+  | Throw
+  | StillMakeAbs
+deriving BEq, Inhabited, DecidableEq, Repr
+
+inductive IfRequestedDirButNoTrailingSlash where
+  | Throw
+  | StillMakeDir
+deriving BEq, Inhabited, DecidableEq, Repr
+
+inductive IfRequestedFileButTrailingSlash where
+  | Throw
+  | DropTrailingSlash
+deriving BEq, Inhabited, DecidableEq, Repr
+
+structure Config where
+  ifParentsNotAllowed_whatToDoIfParentIsInInput : IfParentsNotAllowedButHaveParent
+  ifRequestedRelButStartsWithSlash : IfRequestedRelButStartsWithSlash
+  ifRequestedAbsButNoSlash : IfRequestedAbsButNoSlash
+  ifRequestedDirButNoTrailingSlash : IfRequestedDirButNoTrailingSlash
+  ifRequestedFileButTrailingSlash : IfRequestedFileButTrailingSlash
+deriving BEq, Inhabited
+
+inductive ParseError where
+  | ParentWasNotAllowedByPresentInInput
+  | RequestedRelButStartsWithSlash
+  | RequestedAbsButNoSlash
+  | RequestedDirButNoTrailingSlash
+  | RequestedFileButTrailingSlash
+  | EmptyPath
+  | InvalidComponent (name : String)
+  | PathTooLong
+deriving BEq, DecidableEq, Repr
+
+inductive ParseAutoError where
+  | EmptyPath
+  | InvalidComponent (name : String)
+  | PathTooLong
+deriving BEq, DecidableEq, Repr
+
+def parsePathComponentWithConfig (config : IfParentsNotAllowedButHaveParent) : (allowParents : Bool) → String → Except ParseError (Option (PosixComponent allowParents))
+  | true, ".." => Except.ok (some .parent)
+  | false, ".." =>
+    match config with
+    | .Throw => Except.error ParseError.ParentWasNotAllowedByPresentInInput
+    | .Skip => Except.ok none
+  | _, s =>
+    match PosixNormalComponent.mk? s with
+    | some vc => Except.ok (some (.normal vc))
+    | none => Except.error (ParseError.InvalidComponent s)
+
+def splitPosixPath (s : String) (hasPrefixSlash : Bool) : List String :=
+  let rest := if hasPrefixSlash then s.toList.drop 1 else s.toList
+  splitOnPred rest (· == '/') |>.filter (· ≠ ".")
 
 /-- Parses every component of a `/`-separated path, failing the whole parse
-    if *any* component violates `NAME_MAX`. Doesn't yet check `PATH_MAX` —
-    see `parsePosixPath` below for that. -/
-def parsePosixPathRaw (s : String) : Option PosixPath :=
-  if s.isEmpty then none
-  else if s.startsWith "/" then
-    let rest := s.toList.drop 1
-    let parts := splitOnPred rest (· == '/')
-    (parts.mapM parsePathComponent).map .absolute
-  else
-    let parts := splitOnPred s.toList (· == '/')
-    (parts.mapM parsePathComponent).map .relative
+    if *any* component violates `NAME_MAX`. Also checks that the whole
+    re-serialised path satisfies `PATH_MAX`. -/
+def parsePosixPath (expected : ExpectedPosixPath) (config : Config) (s : String) : Except ParseError (PosixPath expected.allowParents expected.pathType expected.fileType) := do
+  let hasPrefixSlash := s.startsWith "/"
+  let hasSuffixSlash := s.endsWith "/"
 
-/-- A `PosixPath` together with a proof that re-serialising it
-    (`PosixPath.toString`) never exceeds `PATH_MAX` bytes. This is the type
-    you actually want to hand around once a path has been validated. -/
-structure ValidPath where
-  path : PosixPath
-  size_le : path.toString.utf8ByteSize ≤ PATH_MAX
-deriving DecidableEq
+  if expected.pathType == .Rel ∧ hasPrefixSlash then
+    if config.ifRequestedRelButStartsWithSlash == .Throw then
+      throw ParseError.RequestedRelButStartsWithSlash
+  if expected.pathType == .Abs ∧ ¬hasPrefixSlash then
+    if config.ifRequestedAbsButNoSlash == .Throw then
+      throw ParseError.RequestedAbsButNoSlash
 
-instance : ToString ValidPath := ⟨fun vp => vp.path.toString⟩
+  if expected.fileType == .Dir ∧ ¬hasSuffixSlash then
+    if config.ifRequestedDirButNoTrailingSlash == .Throw then
+      throw ParseError.RequestedDirButNoTrailingSlash
+  if expected.fileType == .File ∧ hasSuffixSlash then
+    if config.ifRequestedFileButTrailingSlash == .Throw then
+      throw ParseError.RequestedFileButTrailingSlash
 
-/-- Smart constructor for `ValidPath`. Each component was already checked
-    against `NAME_MAX` while parsing, so this only has to add the
-    whole-path `PATH_MAX` check. -/
-def PosixPath.toValid? (p : PosixPath) : Option ValidPath :=
-  if h : p.toString.utf8ByteSize ≤ PATH_MAX then some ⟨p, h⟩ else none
+  let parts := splitPosixPath s hasPrefixSlash
+  let comps ← parts.filterMapM (parsePathComponentWithConfig config.ifParentsNotAllowed_whatToDoIfParentIsInInput expected.allowParents)
 
-theorem ValidPath.toString_le_PATH_MAX (vp : ValidPath) :
-    vp.path.toString.utf8ByteSize ≤ PATH_MAX := vp.size_le
+  match NonEmptyList.fromList? comps with
+  | none => throw ParseError.EmptyPath
+  | some neParts =>
+    if h : (PosixPath.components_toString expected.pathType expected.fileType neParts).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX then
+      Except.ok ⟨neParts, h⟩
+    else
+      throw ParseError.PathTooLong
 
-/-- Parse a string into a fully-validated POSIX path: every component must
-    satisfy `NAME_MAX`, and the whole re-serialised path must satisfy
-    `PATH_MAX`. -/
-def parsePosixPath (s : String) : Option ValidPath :=
-  (parsePosixPathRaw s).bind PosixPath.toValid?
+structure AnyPosixPath where
+  allowParents : Bool
+  pathType : PathType
+  fileType : FileType
+  path : PosixPath allowParents pathType fileType
+
+def parsePathComponentAuto : (allowParents : Bool) → String → Except ParseAutoError (Option (PosixComponent allowParents))
+  | true, ".." => Except.ok (some .parent)
+  | false, ".." => Except.ok none -- should never be reached in Auto
+  | _, s =>
+    match PosixNormalComponent.mk? s with
+    | some vc => Except.ok (some (.normal vc))
+    | none => Except.error (ParseAutoError.InvalidComponent s)
+
+def parsePosixPathAuto (s : String) : Except ParseAutoError AnyPosixPath := do
+  let hasPrefixSlash := s.startsWith "/"
+  let pathType := if hasPrefixSlash then PathType.Abs else PathType.Rel
+  let fileType := if s.endsWith "/" then FileType.Dir else FileType.File
+  let parts := splitPosixPath s hasPrefixSlash
+  let allowParents := ".." ∈ parts
+
+  let comps ← parts.filterMapM (parsePathComponentAuto allowParents)
+
+  match NonEmptyList.fromList? comps with
+  | none => throw ParseAutoError.EmptyPath
+  | some neParts =>
+    if h : (PosixPath.components_toString pathType fileType neParts).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX then
+      Except.ok ⟨allowParents, pathType, fileType, ⟨neParts, h⟩⟩
+    else
+      throw ParseAutoError.PathTooLong

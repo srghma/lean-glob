@@ -27,3 +27,15 @@ def splitOnPred (cs : List Char) (p : Char → Bool) : List String :=
       else
         loop (c :: acc) res rest
   loop [] [] cs
+
+
+-- Phantom types for path classification
+inductive PathType where
+  | Rel -- Relative path
+  | Abs -- Absolute path
+  deriving BEq, Inhabited, DecidableEq, Ord, Hashable
+
+inductive FileType where
+  | Dir  -- Directory
+  | File -- File
+  deriving BEq, Inhabited, DecidableEq, Ord, Hashable
