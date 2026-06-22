@@ -38,6 +38,12 @@ namespace Windows
 /-- Maximum length of a single path component, in UTF-16 code units. -/
 def SEGMENT_MAX : Nat := 255
 
+/-- Maximum length of a Windows UNC server name, in UTF-16 code units. -/
+def SERVER_MAX : Nat := 255
+
+/-- Maximum length of a Windows SMB share name, in UTF-16 code units. -/
+def SHARE_MAX : Nat := 80
+
 /-- Usable text length under the legacy `MAX_PATH = 260` limit (i.e.
     `260` minus the `NUL` terminator), in UTF-16 code units. -/
 def LEGACY_PATH_MAX : Nat := 259
@@ -62,12 +68,19 @@ def ValidDriveChar.mk? (c : Char) : Option ValidDriveChar :=
   let u := c.toUpper
   if h : 'A' ≤ u ∧ u ≤ 'Z' then some ⟨u, h⟩ else none
 
--- macro "utf16_decide" : tactic => `(tactic| (rw [String.utf16Length]; simp only [String.foldr_eq_foldr_toList, String.reduceToList, List.foldr_cons, List.foldr_nil]; decide))
+instance : Inhabited ValidDriveChar := ⟨{ toChar := 'A' }⟩
+
+def ValidDriveChar.mk! (c : Char) : ValidDriveChar :=
+  match ValidDriveChar.mk? c with
+  | some v => v
+  | none => panic! s!"Invalid drive char: {c}"
+
+macro "utf16Length_decide" : tactic => `(tactic| (simp only [String.utf16Length_eq, Char.utf16Size_eq]; decide))
 
 /-- A path-component name that is non-empty and at most `SEGMENT_MAX`
     *UTF-16 code units* long. -/
 structure ValidComponent extends NonEmptyString where
-  len_le : toString.utf16Length ≤ SEGMENT_MAX := by simp only [String.utf16Length_eq, Char.utf16Size_eq]; decide
+  len_le : toString.utf16Length ≤ SEGMENT_MAX := by utf16Length_decide
 deriving DecidableEq
 
 instance : ToString ValidComponent := ⟨(·.toString)⟩
@@ -79,8 +92,65 @@ def ValidComponent.mk? (s : String) : Option ValidComponent :=
     else none
   else none
 
+instance : Inhabited ValidComponent := ⟨{ toString := "Inhabited ValidComponent" }⟩
+
+def ValidComponent.mk! (s : String) : ValidComponent :=
+  match ValidComponent.mk? s with
+  | some v => v
+  | none => panic! s!"Invalid component: {s}"
+
 theorem ValidComponent.utf16Length_le (c : ValidComponent) :
     c.toString.utf16Length ≤ SEGMENT_MAX := c.len_le
+
+/-- A validated Windows UNC server name.
+    Must be non-empty and at most `255` UTF-16 code units long. -/
+structure ValidServer extends NonEmptyString where
+  len_le : toString.utf16Length ≤ SERVER_MAX := by utf16Length_decide
+deriving DecidableEq
+
+instance : ToString ValidServer := ⟨(·.toString)⟩
+
+def ValidServer.mk? (s : String) : Option ValidServer :=
+  if h1 : s ≠ "" then
+    if h2 : s.utf16Length ≤ SERVER_MAX then
+      some { toString := s, isNonEmpty := h1, len_le := h2 }
+    else none
+  else none
+
+instance : Inhabited ValidServer := ⟨{ toString := "Inhabited ValidServer" }⟩
+
+def ValidServer.mk! (s : String) : ValidServer :=
+  match ValidServer.mk? s with
+  | some v => v
+  | none => panic! s!"Invalid server: {s}"
+
+theorem ValidServer.utf16Length_le (s : ValidServer) :
+    s.toString.utf16Length ≤ SERVER_MAX := s.len_le
+
+/-- A validated Windows SMB share name.
+    Must be non-empty and at most `80` UTF-16 code units long. -/
+structure ValidShare extends NonEmptyString where
+  len_le : toString.utf16Length ≤ SHARE_MAX := by utf16Length_decide
+deriving DecidableEq
+
+instance : ToString ValidShare := ⟨(·.toString)⟩
+
+def ValidShare.mk? (s : String) : Option ValidShare :=
+  if h1 : s ≠ "" then
+    if h2 : s.utf16Length ≤ SHARE_MAX then
+      some { toString := s, isNonEmpty := h1, len_le := h2 }
+    else none
+  else none
+
+instance : Inhabited ValidShare := ⟨{ toString := "Inhabited ValidShare" }⟩
+
+def ValidShare.mk! (s : String) : ValidShare :=
+  match ValidShare.mk? s with
+  | some v => v
+  | none => panic! s!"Invalid share: {s}"
+
+theorem ValidShare.utf16Length_le (s : ValidShare) :
+    s.toString.utf16Length ≤ SHARE_MAX := s.len_le
 
 inductive PathComponent where
   | current
@@ -104,9 +174,9 @@ inductive WindowsPrefix where
   | driveAbsolute (drive : ValidDriveChar)                  -- "C:\"
   | driveRelative (drive : ValidDriveChar)                  -- "D:" (relative to current drive dir)
   | currentDriveAbsolute                                    -- "\" (absolute from current drive root)
-  | unc (server : String) (share : String)                  -- r"\Server\Share"
+  | unc (server : ValidServer) (share : ValidShare)         -- r"\Server\Share"
   | verbatimDisk (drive : ValidDriveChar)                   -- r"\?\C:\"
-  | verbatimUnc (server : String) (share : String)          -- r"\?\UNC\Server\Share"
+  | verbatimUnc (server : ValidServer) (share : ValidShare) -- r"\?\UNC\Server\Share"
   | relative                                                -- no prefix
 deriving DecidableEq
 
@@ -119,9 +189,9 @@ def WindowsPrefix.toString : WindowsPrefix → String
   | .driveAbsolute d          => String.singleton d.toChar ++ ":\\"
   | .driveRelative d          => String.singleton d.toChar ++ ":"
   | .currentDriveAbsolute     => "\\"
-  | .unc server share         => "\\\\" ++ server ++ "\\" ++ share ++ "\\"
+  | .unc server share         => "\\\\" ++ server.toString ++ "\\" ++ share.toString ++ "\\"
   | .verbatimDisk d           => "\\\\?\\" ++ String.singleton d.toChar ++ ":\\"
-  | .verbatimUnc server share => "\\\\?\\UNC\\" ++ server ++ "\\" ++ share ++ "\\"
+  | .verbatimUnc server share => "\\\\?\\UNC\\" ++ server.toString ++ "\\" ++ share.toString ++ "\\"
   | .relative                 => ""
 
 def WindowsPrefix.isVerbatim : WindowsPrefix → Bool
@@ -210,25 +280,31 @@ def matchCurrentDriveAbsolute : List Char → Option (List Char)
   | s :: rest => if isWinSep s then some rest else none
   | _ => none
 
-def parseWinPrefix (cs : List Char) : WindowsPrefix × List Char :=
+def parseWinPrefix (cs : List Char) : Option (WindowsPrefix × List Char) :=
   match matchVerbatimUnc cs with
-  | some (server, share, rest) => (.verbatimUnc server share, rest)
+  | some (server, share, rest) =>
+    match ValidServer.mk? server, ValidShare.mk? share with
+    | some vs, some vsh => some (.verbatimUnc vs vsh, rest)
+    | _, _ => none
   | none =>
     match matchVerbatimDisk cs with
-    | some (d, rest) => (.verbatimDisk d, rest)
+    | some (d, rest) => some (.verbatimDisk d, rest)
     | none =>
       match matchUnc cs with
-      | some (server, share, rest) => (.unc server share, rest)
+      | some (server, share, rest) =>
+        match ValidServer.mk? server, ValidShare.mk? share with
+        | some vs, some vsh => some (.unc vs vsh, rest)
+        | _, _ => none
       | none =>
         match matchDriveAbsolute cs with
-        | some (d, rest) => (.driveAbsolute d, rest)
+        | some (d, rest) => some (.driveAbsolute d, rest)
         | none =>
           match matchDriveRelative cs with
-          | some (d, rest) => (.driveRelative d, rest)
+          | some (d, rest) => some (.driveRelative d, rest)
           | none =>
             match matchCurrentDriveAbsolute cs with
-            | some rest => (.currentDriveAbsolute, rest)
-            | none => (.relative, cs)
+            | some rest => some (.currentDriveAbsolute, rest)
+            | none => some (.relative, cs)
 
 /-- Splits and parses every component, failing if any component violates
     `SEGMENT_MAX`. -/
@@ -241,8 +317,10 @@ def parseWindowsPathRaw (s : String) : Option WindowsPath :=
   if s.isEmpty then none
   else
     let cs := s.toList
-    let (prefix_, rest) := parseWinPrefix cs
-    (splitWinComponents rest).map (fun comps => ⟨prefix_, comps⟩)
+    match parseWinPrefix cs with
+    | some (prefix_, rest) =>
+      (splitWinComponents rest).map (fun comps => ⟨prefix_, comps⟩)
+    | none => none
 
 /-- Parse a string into a fully-validated Windows path: every component must
     satisfy `SEGMENT_MAX`, and the whole re-serialised path must satisfy the

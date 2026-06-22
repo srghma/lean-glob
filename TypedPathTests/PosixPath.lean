@@ -5,18 +5,10 @@ meta import TypedPath.PosixPath
 namespace Posix.Tests
 open Posix
 
--- Test-only convenience: build a `ValidComponent` straight from a literal
--- you already know is valid, so the test data below reads almost like the
--- original file. Falls back to a dummy "x" if you ever pass it something
--- invalid — fine for tests, do not use this pattern outside of tests.
-instance : Inhabited ValidComponent :=
-  ⟨{ toString := "x" }⟩
-
-def nc! (s : String) : PathComponent := .normal ((ValidComponent.mk? s).getD default)
 
 -- --- Component-level: NAME_MAX -----------------------------------------
 
-#guard decide (parsePathComponent "var" = some (nc! "var"))
+#guard decide (parsePathComponent "var" = some (.normal (ValidComponent.mk! "var")))
 #guard decide (parsePathComponent "." = some .current)
 #guard decide (parsePathComponent ".." = some .parent)
 #guard decide (parsePathComponent ("".pushn 'a' NAME_MAX) ≠ none)        -- exactly 255 bytes: OK
@@ -25,15 +17,15 @@ def nc! (s : String) : PathComponent := .normal ((ValidComponent.mk? s).getD def
 -- --- Raw parsing (no PATH_MAX check yet) -------------------------------
 
 #guard decide (parsePosixPathRaw "/var/log/syslog" =
-  some (.absolute [nc! "var", nc! "log", nc! "syslog"]))
-#guard decide (parsePosixPathRaw "config.json" = some (.relative [nc! "config.json"]))
+  some (.absolute [.normal (ValidComponent.mk! "var"), .normal (ValidComponent.mk! "log"), .normal (ValidComponent.mk! "syslog")]))
+#guard decide (parsePosixPathRaw "config.json" = some (.relative [.normal (ValidComponent.mk! "config.json")]))
 #guard decide (parsePosixPathRaw "./scripts/deploy.sh" =
-  some (.relative [.current, nc! "scripts", nc! "deploy.sh"]))
+  some (.relative [.current, .normal (ValidComponent.mk! "scripts"), .normal (ValidComponent.mk! "deploy.sh")]))
 #guard decide (parsePosixPathRaw "../logs/error.log" =
-  some (.relative [.parent, nc! "logs", nc! "error.log"]))
+  some (.relative [.parent, .normal (ValidComponent.mk! "logs"), .normal (ValidComponent.mk! "error.log")]))
 #guard decide (parsePosixPathRaw ".." = some (.relative [.parent]))
 #guard decide (parsePosixPathRaw "../" = some (.relative [.parent]))
-#guard decide (parsePosixPathRaw ".../" = some (.relative [nc! "..."]))
+#guard decide (parsePosixPathRaw ".../" = some (.relative [.normal (ValidComponent.mk! "...")]))
 #guard decide (parsePosixPathRaw "." = some (.relative [.current]))
 #guard decide (parsePosixPathRaw "./" = some (.relative [.current]))
 #guard decide (parsePosixPathRaw "" = none)
@@ -45,7 +37,7 @@ def nc! (s : String) : PathComponent := .normal ((ValidComponent.mk? s).getD def
 -- --- Fully validated parsing: PATH_MAX -------------------------------
 
 #guard decide ((parsePosixPath "/var/log/syslog").map (·.path) =
-  some (.absolute [nc! "var", nc! "log", nc! "syslog"]))
+  some (.absolute [.normal (ValidComponent.mk! "var"), .normal (ValidComponent.mk! "log"), .normal (ValidComponent.mk! "syslog")]))
 #guard decide ((parsePosixPath "/var/log/syslog").map (·.path.toString) =
   some "/var/log/syslog")
 

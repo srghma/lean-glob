@@ -5,37 +5,34 @@ meta import TypedPath.WindowsPath
 namespace Windows.Tests
 open Windows
 
--- Test-only convenience constructors (see the note in PosixPath.lean).
-instance : Inhabited ValidDriveChar :=
-  ⟨{ toChar := 'A' }⟩
-instance : Inhabited ValidComponent :=
-  ⟨{ toString := "x" }⟩
-
-def dc! (c : Char) : ValidDriveChar := (ValidDriveChar.mk? c).getD default
-def wnc! (s : String) : PathComponent := .normal ((ValidComponent.mk? s).getD default)
-
 -- --- Component-level: SEGMENT_MAX --------------------------------------
 
 #guard decide (parsePathComponent ("".pushn 'a' SEGMENT_MAX) ≠ none)        -- 255 units: OK
 #guard decide (parsePathComponent ("".pushn 'a' (SEGMENT_MAX + 1)) = none)  -- 256 units: rejected
 
+-- Server and share name limit tests
+#guard decide (parseWindowsPathRaw ("\\\\" ++ "".pushn 'a' SERVER_MAX ++ "\\Shared\\Reports") ≠ none)
+#guard decide (parseWindowsPathRaw ("\\\\" ++ "".pushn 'a' (SERVER_MAX + 1) ++ "\\Shared\\Reports") = none)
+#guard decide (parseWindowsPathRaw ("\\\\Server01\\" ++ "".pushn 'a' SHARE_MAX ++ "\\Reports") ≠ none)
+#guard decide (parseWindowsPathRaw ("\\\\Server01\\" ++ "".pushn 'a' (SHARE_MAX + 1) ++ "\\Reports") = none)
+
 -- --- Raw parsing (no whole-path length check yet) ----------------------
 
 #guard decide (parseWindowsPathRaw r"C:\Windows\System32\cmd.exe" =
-  some ⟨.driveAbsolute (dc! 'C'), [wnc! "Windows", wnc! "System32", wnc! "cmd.exe"]⟩)
+  some ⟨.driveAbsolute (ValidDriveChar.mk! 'C'), [.normal (ValidComponent.mk! "Windows"), .normal (ValidComponent.mk! "System32"), .normal (ValidComponent.mk! "cmd.exe")]⟩)
 #guard decide (parseWindowsPathRaw r"C:\Windows/System32\cmd.exe" =
-  some ⟨.driveAbsolute (dc! 'C'), [wnc! "Windows", wnc! "System32", wnc! "cmd.exe"]⟩)
+  some ⟨.driveAbsolute (ValidDriveChar.mk! 'C'), [.normal (ValidComponent.mk! "Windows"), .normal (ValidComponent.mk! "System32"), .normal (ValidComponent.mk! "cmd.exe")]⟩)
 #guard decide (parseWindowsPathRaw r"\\Server01\Shared\Reports" =
-  some ⟨.unc "Server01" "Shared", [wnc! "Reports"]⟩)
+  some ⟨.unc (ValidServer.mk! "Server01") (ValidShare.mk! "Shared"), [.normal (ValidComponent.mk! "Reports")]⟩)
 #guard decide (parseWindowsPathRaw r"\\?\C:\VeryLongPath\file.txt" =
-  some ⟨.verbatimDisk (dc! 'C'), [wnc! "VeryLongPath", wnc! "file.txt"]⟩)
+  some ⟨.verbatimDisk (ValidDriveChar.mk! 'C'), [.normal (ValidComponent.mk! "VeryLongPath"), .normal (ValidComponent.mk! "file.txt")]⟩)
 #guard decide (parseWindowsPathRaw r"\\?\UNC\Server01\Shared\file.txt" =
-  some ⟨.verbatimUnc "Server01" "Shared", [wnc! "file.txt"]⟩)
-#guard decide (parseWindowsPathRaw r"settings.ini" = some ⟨.relative, [wnc! "settings.ini"]⟩)
+  some ⟨.verbatimUnc (ValidServer.mk! "Server01") (ValidShare.mk! "Shared"), [.normal (ValidComponent.mk! "file.txt")]⟩)
+#guard decide (parseWindowsPathRaw r"settings.ini" = some ⟨.relative, [.normal (ValidComponent.mk! "settings.ini")]⟩)
 #guard decide (parseWindowsPathRaw r"\Users\John\Documents" =
-  some ⟨.currentDriveAbsolute, [wnc! "Users", wnc! "John", wnc! "Documents"]⟩)
+  some ⟨.currentDriveAbsolute, [.normal (ValidComponent.mk! "Users"), .normal (ValidComponent.mk! "John"), .normal (ValidComponent.mk! "Documents")]⟩)
 #guard decide (parseWindowsPathRaw r"D:Documents\budget.xlsx" =
-  some ⟨.driveRelative (dc! 'D'), [wnc! "Documents", wnc! "budget.xlsx"]⟩)
+  some ⟨.driveRelative (ValidDriveChar.mk! 'D'), [.normal (ValidComponent.mk! "Documents"), .normal (ValidComponent.mk! "budget.xlsx")]⟩)
 
 -- lower-case drive letters canonicalise to upper-case
 #guard decide (parseWindowsPathRaw r"c:\Windows" = parseWindowsPathRaw r"C:\Windows")

@@ -53,6 +53,13 @@ def ValidComponent.mk? (s : String) : Option ValidComponent :=
     else none
   else none
 
+instance : Inhabited ValidComponent := ⟨{ toString := "Inhabited ValidComponent" }⟩
+
+def ValidComponent.mk! (s : String) : ValidComponent :=
+  match ValidComponent.mk? s with
+  | some v => v
+  | none => panic! s!"Invalid component: {s}"
+
 theorem ValidComponent.utf8ByteSize_le (c : ValidComponent) :
     c.toString.utf8ByteSize ≤ NAME_MAX := c.len_le
 
