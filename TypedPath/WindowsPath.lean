@@ -2,6 +2,7 @@ module
 public import NonEmpty.String
 public import TypedPath.PathCommon
 public import Lean.Data.Lsp.Utf16
+public import TypedPath.Utf16LengthTheorem
 
 @[expose] public section
 
@@ -66,7 +67,7 @@ def ValidDriveChar.mk? (c : Char) : Option ValidDriveChar :=
 /-- A path-component name that is non-empty and at most `SEGMENT_MAX`
     *UTF-16 code units* long. -/
 structure ValidComponent extends NonEmptyString where
-  len_le : toString.utf16Length ≤ SEGMENT_MAX := by native_decide
+  len_le : toString.utf16Length ≤ SEGMENT_MAX := by simp only [String.utf16Length_eq, Char.utf16Size_eq]; decide
 deriving DecidableEq
 
 instance : ToString ValidComponent := ⟨(·.toString)⟩

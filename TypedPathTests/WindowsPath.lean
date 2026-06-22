@@ -1,7 +1,6 @@
 module
 import TypedPath.WindowsPath
 meta import TypedPath.WindowsPath
-import Lean.Data.Lsp.Utf16
 
 namespace Windows.Tests
 open Windows
