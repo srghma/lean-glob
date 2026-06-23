@@ -36,22 +36,22 @@
         ];
 
         # Needed for correct linkage of C++ standard library
-        envVars = {
-          CXX = "clang++";
-          CC = "clang";
-          CXXFLAGS = "-stdlib=libc++";
-          LDFLAGS = "-lc++ -lc++abi";
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
-        };
+        # envVars = {
+        #   CXX = "clang++";
+        #   CC = "clang";
+        #   CXXFLAGS = "-stdlib=libc++";
+        #   LDFLAGS = "-lc++ -lc++abi";
+        #   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
+        # };
 
       in
       {
         devShells.default = pkgs.mkShell {
           inherit buildInputs;
-          shellHook = ''
-            echo "🧠 Lean dev shell ready"
-            export ${builtins.concatStringsSep " " (builtins.attrValues envVars)}
-          '';
+          # shellHook = ''
+          #   echo "🧠 Lean dev shell ready"
+          #   export ${builtins.concatStringsSep " " (builtins.attrValues envVars)}
+          # '';
         };
         # packages.default = pkgs.stdenv.mkDerivation {
         #   name = "lean-glob-posix";

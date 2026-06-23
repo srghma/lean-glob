@@ -6,8 +6,8 @@ keywords = ["glob", "pattern", "matching"]
 
 [[require]]
 name = "Regex"
-# git = "https://github.com/pandaman64/lean-regex.git"
-git = "https://github.com/srghma/lean-regex.git"
+git = "https://github.com/pandaman64/lean-regex.git"
+# git = "https://github.com/srghma/lean-regex.git"
 rev = "main"
 subDir = "regex"
 
