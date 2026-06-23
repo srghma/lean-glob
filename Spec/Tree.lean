@@ -26,10 +26,8 @@ def withTempDirTree (t : Tree) (cont : FilePath → IO α) : IO α :=
 def withTempDirForest (trees : List Tree) (cont : FilePath → IO α) : IO α :=
   IO.FS.withTempDir fun tmpDir => do createAtPathForest trees tmpDir; cont tmpDir
 
-def withinTempDirTree (t : Tree) (cont : FilePath → IO α) : IO α :=
-  withTempDirTree t (fun tmpDir => do IO.Process.setCurrentDir tmpDir; cont tmpDir)
+-- def withinTempDirTree (t : Tree) (cont : FilePath → IO α) : IO α :=
+--   withTempDirTree t (fun tmpDir => do IO.Process.setCurrentDir tmpDir; cont tmpDir)
 
-def withinTempDirForest (ts : List Tree) (cont : FilePath → IO α) : IO α :=
-  withTempDirForest ts (fun tmpDir => do IO.Process.setCurrentDir tmpDir; cont tmpDir)
-
-end
+-- def withinTempDirForest (ts : List Tree) (cont : FilePath → IO α) : IO α :=
+--   withTempDirForest ts (fun tmpDir => do IO.Process.setCurrentDir tmpDir; cont tmpDir)

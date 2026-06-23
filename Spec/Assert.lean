@@ -18,6 +18,10 @@ open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
 
+initialize initialCwd : IO.Ref FilePath ← do
+  let cwd ← IO.currentDir
+  IO.mkRef cwd
+
 -- Helper for comparing arrays of strings, ignoring order
 def _root_.Array.sortedEq (arr1 arr2 : Array String) : Bool :=
   arr1.insertionSort == arr2.insertionSort
@@ -57,7 +61,7 @@ def assertThrows (name : String) (ioAction : IO Unit) : IO Unit := do
 /-- Run `act` inside a fresh temporary directory, restoring the previous working
 directory afterwards. Each parallel test gets its own isolated dir. -/
 def withinTempDir (act : FilePath → IO α) : IO α := do
-  let prev ← IO.currentDir
+  let prev ← initialCwd.get
   -- unique-ish directory name based on a high-resolution timestamp.
   let stamp ← IO.monoNanosNow
   let dir : FilePath := prev / s!".spec-tmp-{stamp}"

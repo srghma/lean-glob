@@ -1,6 +1,7 @@
 module
 import Init.System.IO
 public import Std.Sync.Mutex
+public import Spec.Assert
 
 open IO
 
@@ -200,7 +201,9 @@ structure Config where
   deriving Inhabited
 
 /-- File used to remember which tests failed last run (`--only-failures`). -/
-def failuresFile : String := ".spec-failures"
+def failuresFile : IO System.FilePath := do
+  let base ← _root_.Spec.Assert.initialCwd.get
+  return base / ".spec-failures"
 
 def parseArgs (args : List String) : Config := Id.run do
   let mut cfg : Config := {}
@@ -347,11 +350,14 @@ def runLeaves (cfg : Config) (reporters : List Reporter) (leaves : Array (Leaf U
 def saveFailures (results : Array ItemResult) : IO Unit := do
   let failed := results.filterMap fun r =>
     if isFailure r.outcome then some (String.intercalate " » " (r.path.toList ++ [r.name])) else none
-  unless failed.isEmpty do IO.FS.writeFile failuresFile (String.intercalate "\n" failed.toList)
+  unless failed.isEmpty do
+    let file ← failuresFile
+    IO.FS.writeFile file (String.intercalate "\n" failed.toList)
 
 def loadFailures : IO (Array String) := do
   try
-    let content ← IO.FS.readFile failuresFile
+    let file ← failuresFile
+    let content ← IO.FS.readFile file
     return content.splitOn "\n" |>.filter (!·.isEmpty) |>.toArray
   catch _ => return #[]
 

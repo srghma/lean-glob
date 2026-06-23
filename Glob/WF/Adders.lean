@@ -17,7 +17,6 @@ import NonEmpty.List.Upgraders
 import NonEmpty.String
 import NonEmpty.List
 -- import Mathlib.Data.List.Induction -- REQUIRED
--- import Aesop
 import Glob.NonWF.Types
 import Glob.WF.Types
 

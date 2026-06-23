@@ -4,7 +4,6 @@ public import Lean.Elab.Term.TermElabM
 public import NonEmpty.String
 public import NonEmpty.ListCorrectByConstruction
 public import TypedPath.PathCommon
-import Aesop
 
 @[expose] public section
 

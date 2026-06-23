@@ -25,36 +25,36 @@ open Spec.Assert
 safe to run in parallel. -/
 def spec : Spec := do
   describe "Glob (real filesystem)" do
-    it "FindRecursive" do withinTempDirForest (tree! { "foo.txt", "subdir" { "bar.txt", "foo.txt", "another_subdir" { "bar.txt", "foo.txt" } } }) fun tmpDir => do
+    it "FindRecursive" do withTempDirForest (tree! { "foo.txt", "subdir" { "bar.txt", "foo.txt", "another_subdir" { "bar.txt", "foo.txt" } } }) fun tmpDir => do
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "**/foo.txt") [PatternSegmentNonWF.doubleStar, PatternSegmentNonWF.lit (nes!"foo.txt")]) #["foo.txt", "subdir/foo.txt", "subdir/another_subdir/foo.txt"]
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "foo.txt") [PatternSegmentNonWF.lit (nes!"foo.txt")]) #["foo.txt"]
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "*/foo.txt") [PatternSegmentNonWF.oneStar, PatternSegmentNonWF.lit (nes!"foo.txt")]) #["subdir/foo.txt"]
 
-    it "BasicWildcard" do withinTempDirForest (tree! { "file1.txt", "file2.txt", "image.png", "subdir" { "file3.txt" }, "empty_dir" {} }) fun tmpDir => do
+    it "BasicWildcard" do withTempDirForest (tree! { "file1.txt", "file2.txt", "image.png", "subdir" { "file3.txt" }, "empty_dir" {} }) fun tmpDir => do
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "*") [PatternSegmentNonWF.oneStar]) #["empty_dir", "file1.txt", "file2.txt", "image.png", "subdir"]
 
-    it "QuestionMark" do withinTempDirForest (tree! { "doc1", "doc2", "doc_long" }) fun tmpDir => do
+    it "QuestionMark" do withTempDirForest (tree! { "doc1", "doc2", "doc_long" }) fun tmpDir => do
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "doc?") [PatternSegmentNonWF.regex (Regex.parse! "^doc.$")]) #["doc1", "doc2"]
 
-    it "CharacterClass" do withinTempDirForest (tree! { "apple", "apricot", "banana" }) fun tmpDir => do
+    it "CharacterClass" do withTempDirForest (tree! { "apple", "apricot", "banana" }) fun tmpDir => do
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "a[p-r]*") [PatternSegmentNonWF.regex (Regex.parse! "^a[p-r].*$")]) #["apple", "apricot"]
 
-    it "GlobWithDirMark" do withinTempDirForest (tree! { "file.txt", "mydir" {}, "another_dir" {} }) fun tmpDir => do
+    it "GlobWithDirMark" do withTempDirForest (tree! { "file.txt", "mydir" {}, "another_dir" {} }) fun tmpDir => do
       let expected := #["file.txt", "mydir/", "another_dir/"]
       assertEq "globWithDirMark *" expected (← globWithDirMark tmpDir (patternStrict "*"))
 
-    it "CheckPattern" do withinTempDirForest (tree! { "existing.txt", "another.md" }) fun tmpDir => do
+    it "CheckPattern" do withTempDirForest (tree! { "existing.txt", "another.md" }) fun tmpDir => do
       assertBool "checkPattern *.txt (true)" true (← checkPattern tmpDir (patternStrict "*.txt"))
       assertBool "checkPattern *.xyz (false)" false (← checkPattern tmpDir (patternStrict "*.xyz"))
       assertBool "checkPattern existing.txt (true)" true (← checkPattern tmpDir (patternStrict "existing.txt"))
       assertBool "checkPattern non_existing.txt (false)" false (← checkPattern tmpDir (patternStrict "non_existing.txt"))
 
-    it "GlobMany" do withinTempDirForest (tree! { "file.txt", "doc.md", "image.jpg", "data.csv" }) fun tmpDir => do
+    it "GlobMany" do withTempDirForest (tree! { "file.txt", "doc.md", "image.jpg", "data.csv" }) fun tmpDir => do
       assertGlobMany tmpDir ![(assertAreEqualAndReturnFirst (patternStrict "file.txt") [PatternSegmentNonWF.lit (nes!"file.txt")]),(assertAreEqualAndReturnFirst (patternStrict "doc.md") [PatternSegmentNonWF.lit (nes!"doc.md")]),(assertAreEqualAndReturnFirst (patternStrict "data.csv") [PatternSegmentNonWF.lit (nes!"data.csv")])] #["data.csv", "doc.md", "file.txt"]
       assertGlobMany tmpDir ![(assertAreEqualAndReturnFirst (patternStrict "nonexistent.xyz") [PatternSegmentNonWF.lit (nes!"nonexistent.xyz")]),(assertAreEqualAndReturnFirst (patternStrict "file.txt") [PatternSegmentNonWF.lit (nes!"file.txt")])] #["file.txt"]
       assertGlobMany tmpDir ![(assertAreEqualAndReturnFirst (patternStrict "nonexistent.xyz") [PatternSegmentNonWF.lit (nes!"nonexistent.xyz")]),(assertAreEqualAndReturnFirst (patternStrict "nonexistent.abc") [PatternSegmentNonWF.lit (nes!"nonexistent.abc")])] #[]
 
-    it "GlobWithBraces" do withinTempDirForest (tree! { "config.json", "config.yaml", "config.txt", "data.json" }) fun tmpDir => do
+    it "GlobWithBraces" do withTempDirForest (tree! { "config.json", "config.yaml", "config.txt", "data.json" }) fun tmpDir => do
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "config.{json,yaml}") [PatternSegmentNonWF.regex (Regex.parse! "^config\\.(json|yaml)$")]) #["config.json", "config.yaml"]
 
     it "GlobWithTilde" do
@@ -66,7 +66,7 @@ def spec : Spec := do
       -- We'll just verify it doesn't throw and parses properly.
         assertBool "Tilde expansion works" true true
 
-    it "GlobWithEnvVars" do withinTempDirForest (tree! { "foo.txt" }) fun tmpDir => do
+    it "GlobWithEnvVars" do withTempDirForest (tree! { "foo.txt" }) fun tmpDir => do
       let _ ← try IO.Process.run { cmd := "env", args := #["MY_TEST_VAR=foo"] } catch _ => pure ""
       -- Wait, Lean's System doesn't easily let us putEnv.
       -- Instead, we can rely on an always-present env var like HOME or USER.
@@ -75,21 +75,21 @@ def spec : Spec := do
       -- We'll just verify it doesn't throw and parses properly.
       assertBool "Env var expansion works" true true
 
-    it "GlobDirsOnly" do withinTempDirForest (tree! { "file.txt", "dir1" { "nested_file.txt" }, "dir2" {} }) fun tmpDir => do
+    it "GlobDirsOnly" do withTempDirForest (tree! { "file.txt", "dir1" { "nested_file.txt" }, "dir2" {} }) fun tmpDir => do
       assertEq "globDirsOnly *" #["dir1/", "dir2/"] (← globDirsOnly tmpDir (assertAreEqualAndReturnFirst (patternStrict "*") [PatternSegmentNonWF.oneStar]))
 
-    it "FindByExtension" do withinTempDirForest (tree! { "a.lean", "b.md", "c.lean" }) fun tmpDir => do
+    it "FindByExtension" do withTempDirForest (tree! { "a.lean", "b.md", "c.lean" }) fun tmpDir => do
       assertEq "findByExtension lean" #["a.lean", "c.lean"] (← findByExtension tmpDir "lean")
       assertIsEmpty "findByExtension xyz (empty)" (← findByExtension tmpDir "xyz")
 
-    it "FindByExtensions" do withinTempDirForest (tree! { "a.lean", "b.md", "c.txt", "d.json" }) fun tmpDir => do
+    it "FindByExtensions" do withTempDirForest (tree! { "a.lean", "b.md", "c.txt", "d.json" }) fun tmpDir => do
       assertEq "findByExtensions lean, txt" #["a.lean", "c.txt"] (← findByExtensions tmpDir #["lean", "txt"])
       assertIsEmpty "findByExtensions xyz, abc (empty)" (← findByExtensions tmpDir #["xyz", "abc"])
 
-    it "FindDirectories" do withinTempDirForest (tree! { "file.txt", "dir1" { "nested.txt" }, "dir2" {} }) fun tmpDir => do
+    it "FindDirectories" do withTempDirForest (tree! { "file.txt", "dir1" { "nested.txt" }, "dir2" {} }) fun tmpDir => do
       assertEq "findDirectories tmpDir" #["dir1/", "dir2/"] (← findDirectories tmpDir)
 
-    it "NoMatchesWithoutNoCheck" do withinTempDirForest (tree! {}) fun tmpDir => do
+    it "NoMatchesWithoutNoCheck" do withTempDirForest (tree! {}) fun tmpDir => do
       assertGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "nonexistent.txt") [PatternSegmentNonWF.lit (nes!"nonexistent.txt")]) #[]
 
     -- if !System.Platform.isWindows then
