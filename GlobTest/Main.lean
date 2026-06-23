@@ -9,6 +9,7 @@ public import GlobTest.GlobSpec
 public import GlobTest.GlobRealSpec
 public import GlobTest.Spec.Core
 public import GlobTest.Spec.Reporter
+public import TypedGlobTest.GlobRealSpec
 
 @[expose] public section
 
@@ -20,3 +21,4 @@ def main (args : List String) : IO UInt32 :=
     describe "Glob library" do
       GlobSpec.spec
       globRealSpec
+      typedGlobRealSpec

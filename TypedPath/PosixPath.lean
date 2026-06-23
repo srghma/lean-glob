@@ -1,4 +1,6 @@
 module
+import Lean
+public import Lean.Elab.Term.TermElabM
 public import NonEmpty.String
 public import NonEmpty.ListCorrectByConstruction
 public import TypedPath.PathCommon
@@ -113,19 +115,30 @@ def PosixPath.components_toString (pathType : PathType) (fileType : FileType) (c
 
 /-- A POSIX path, before the whole-path `PATH_MAX` check. -/
 -- Absolute means IF true THEN means starts with / ELSE ./foo or foo will be parsed same but printed only to foo
-structure PosixPath (allowParents : Bool) (pathType : PathType) (fileType : FileType) where
-  components : NonEmptyList (PosixComponent allowParents)
-  size_le : (PosixPath.components_toString pathType fileType components).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX
+inductive PosixPath (allowParents : Bool) (pathType : PathType) (fileType : FileType) : Bool → Type where
+  | cwd : PosixPath allowParents pathType fileType true
+  | path {allowCwd : Bool}
+    (components : NonEmptyList (PosixComponent allowParents))
+    (size_le : (PosixPath.components_toString pathType fileType components).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX)
+    : PosixPath allowParents pathType fileType allowCwd
 deriving DecidableEq
 
-instance : ToString (PosixPath allowParents pathType fileType) :=
-  ⟨fun p => PosixPath.components_toString pathType fileType p.components⟩
+instance : ToString (PosixPath allowParents pathType fileType allowCwd) :=
+  ⟨fun
+    | .cwd => "."
+    | .path components _ => PosixPath.components_toString pathType fileType components⟩
 
 structure ExpectedPosixPath where
+  allowCwd : Bool
   allowParents : Bool
   pathType : PathType
   fileType : FileType
 deriving BEq, Inhabited, DecidableEq
+
+inductive IfCwdNotAllowedButInputIsCwd where
+  | Throw
+  | Skip
+deriving BEq, Inhabited, DecidableEq, Repr
 
 inductive IfParentsNotAllowedButHaveParent where
   | Throw
@@ -153,6 +166,9 @@ inductive IfRequestedFileButTrailingSlash where
 deriving BEq, Inhabited, DecidableEq, Repr
 
 structure Config where
+  allowTrailingSeparator : Bool
+  treatTwoOrMoreRepeatingSeparatorsAsOne : Bool
+  cwdIsNotAllowedButInputIsCwd : IfCwdNotAllowedButInputIsCwd
   ifParentsNotAllowed_whatToDoIfParentIsInInput : IfParentsNotAllowedButHaveParent
   ifRequestedRelButStartsWithSlash : IfRequestedRelButStartsWithSlash
   ifRequestedAbsButNoSlash : IfRequestedAbsButNoSlash
@@ -160,7 +176,22 @@ structure Config where
   ifRequestedFileButTrailingSlash : IfRequestedFileButTrailingSlash
 deriving BEq, Inhabited
 
+inductive ParseAutoError where
+  | EmptyPath
+  | InvalidComponent (name : String)
+  | PathTooLong
+deriving BEq, DecidableEq, Repr
+
+instance : ToString ParseAutoError where
+  toString
+  | .EmptyPath => "The parsed path contains no valid components (e.g. empty string or only skipped components)."
+  | .InvalidComponent name => s!"Invalid path component: `{name}`. Components cannot exceed POSIX_NORMAL_COMPONENT_MAX ({POSIX_NORMAL_COMPONENT_MAX}) bytes and cannot contain `/`."
+  | .PathTooLong => s!"The fully resolved path exceeds the POSIX_WHOLE_PATH_MAX ({POSIX_WHOLE_PATH_MAX}) limit."
+
 inductive ParseError where
+  | RepeatingSeparatorsNotAllowed
+  | TrailingSeparatorNotAllowed
+  | CwdNotAllowedButInputIsCwd
   | ParentWasNotAllowedByPresentInInput
   | RequestedRelButStartsWithSlash
   | RequestedAbsButNoSlash
@@ -171,11 +202,24 @@ inductive ParseError where
   | PathTooLong
 deriving BEq, DecidableEq, Repr
 
-inductive ParseAutoError where
-  | EmptyPath
-  | InvalidComponent (name : String)
-  | PathTooLong
-deriving BEq, DecidableEq, Repr
+instance : ToString ParseError where
+  toString
+  | .RepeatingSeparatorsNotAllowed => "Repeating separators (e.g. `foo//bar` or `foo///bar`) are not allowed by the configuration."
+  | .TrailingSeparatorNotAllowed => "Trailing separators (e.g. `foo/`) are not allowed by the configuration."
+  | .CwdNotAllowedButInputIsCwd => "The current working directory (e.g. `.` or `./`) is not allowed by the configuration."
+  | .ParentWasNotAllowedByPresentInInput => "Parent directory components (`..`) are not allowed by the configuration."
+  | .RequestedRelButStartsWithSlash => "A relative path was requested, but the input starts with a slash (`/`)."
+  | .RequestedAbsButNoSlash => "An absolute path was requested, but the input does not start with a slash (`/`)."
+  | .RequestedDirButNoTrailingSlash => "A directory path was requested, but the input does not end with a trailing slash (`/`)."
+  | .RequestedFileButTrailingSlash => "A file path was requested, but the input ends with a trailing slash (`/`)."
+  | .EmptyPath => "The parsed path contains no valid components (e.g. empty string or only skipped components)."
+  | .InvalidComponent name => s!"Invalid path component: `{name}`. Components cannot exceed POSIX_NORMAL_COMPONENT_MAX ({POSIX_NORMAL_COMPONENT_MAX}) bytes and cannot contain `/`."
+  | .PathTooLong => s!"The fully resolved path exceeds the POSIX_WHOLE_PATH_MAX ({POSIX_WHOLE_PATH_MAX}) limit."
+
+def ParseAutoError.toParseError : ParseAutoError → ParseError
+  | .EmptyPath => .EmptyPath
+  | .InvalidComponent s => .InvalidComponent s
+  | .PathTooLong => .PathTooLong
 
 def parsePathComponentWithConfig (config : IfParentsNotAllowedButHaveParent) : (allowParents : Bool) → String → Except ParseError (Option (PosixComponent allowParents))
   | true, ".." => Except.ok (some .parent)
@@ -190,14 +234,36 @@ def parsePathComponentWithConfig (config : IfParentsNotAllowedButHaveParent) : (
 
 def splitPosixPath (s : String) (hasPrefixSlash : Bool) : List String :=
   let rest := if hasPrefixSlash then s.toList.drop 1 else s.toList
-  splitOnPred rest (· == '/') |>.filter (· ≠ ".")
+  splitOnPred rest (· == '/') |>.filter (fun c => c ≠ "." ∧ c ≠ "")
+
+def containsTwoSlashes (s : String) : Bool :=
+  let rec go : List Char → Bool
+    | '/' :: '/' :: _ => true
+    | _ :: t => go t
+    | [] => false
+  go s.toList
+
+def PosixPath.mk? {allowCwd allowParents pathType fileType} (comps : List (PosixComponent allowParents)) : Except ParseAutoError (PosixPath allowParents pathType fileType allowCwd) :=
+  match NonEmptyList.fromList? comps with
+  | none => Except.error ParseAutoError.EmptyPath
+  | some neParts =>
+    if h : (PosixPath.components_toString pathType fileType neParts).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX then
+      Except.ok (.path neParts h)
+    else
+      Except.error ParseAutoError.PathTooLong
 
 /-- Parses every component of a `/`-separated path, failing the whole parse
     if *any* component violates `NAME_MAX`. Also checks that the whole
     re-serialised path satisfies `PATH_MAX`. -/
-def parsePosixPath (expected : ExpectedPosixPath) (config : Config) (s : String) : Except ParseError (PosixPath expected.allowParents expected.pathType expected.fileType) := do
+def parsePosixPath (expected : ExpectedPosixPath) (config : Config) (s : String) : Except ParseError (PosixPath expected.allowParents expected.pathType expected.fileType expected.allowCwd) := do
   let hasPrefixSlash := s.startsWith "/"
   let hasSuffixSlash := s.endsWith "/"
+
+  if ¬config.treatTwoOrMoreRepeatingSeparatorsAsOne ∧ containsTwoSlashes s then
+    throw ParseError.RepeatingSeparatorsNotAllowed
+
+  if ¬config.allowTrailingSeparator ∧ s.length > 1 ∧ hasSuffixSlash then
+    throw ParseError.TrailingSeparatorNotAllowed
 
   if expected.pathType == .Rel ∧ hasPrefixSlash then
     if config.ifRequestedRelButStartsWithSlash == .Throw then
@@ -213,22 +279,26 @@ def parsePosixPath (expected : ExpectedPosixPath) (config : Config) (s : String)
     if config.ifRequestedFileButTrailingSlash == .Throw then
       throw ParseError.RequestedFileButTrailingSlash
 
+  if s == "." ∨ s == "./" then
+    if h : expected.allowCwd then
+      return h ▸ .cwd
+    else
+      if config.cwdIsNotAllowedButInputIsCwd == .Throw then
+        throw ParseError.CwdNotAllowedButInputIsCwd
+
   let parts := splitPosixPath s hasPrefixSlash
   let comps ← parts.filterMapM (parsePathComponentWithConfig config.ifParentsNotAllowed_whatToDoIfParentIsInInput expected.allowParents)
 
-  match NonEmptyList.fromList? comps with
-  | none => throw ParseError.EmptyPath
-  | some neParts =>
-    if h : (PosixPath.components_toString expected.pathType expected.fileType neParts).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX then
-      Except.ok ⟨neParts, h⟩
-    else
-      throw ParseError.PathTooLong
+  match PosixPath.mk? comps with
+  | Except.ok p => Except.ok p
+  | Except.error e => Except.error e.toParseError
 
 structure AnyPosixPath where
+  allowCwd : Bool
   allowParents : Bool
   pathType : PathType
   fileType : FileType
-  path : PosixPath allowParents pathType fileType
+  path : PosixPath allowParents pathType fileType allowCwd
 
 def parsePathComponentAuto : (allowParents : Bool) → String → Except ParseAutoError (Option (PosixComponent allowParents))
   | true, ".." => Except.ok (some .parent)
@@ -242,15 +312,80 @@ def parsePosixPathAuto (s : String) : Except ParseAutoError AnyPosixPath := do
   let hasPrefixSlash := s.startsWith "/"
   let pathType := if hasPrefixSlash then PathType.Abs else PathType.Rel
   let fileType := if s.endsWith "/" then FileType.Dir else FileType.File
+
+  if s == "." ∨ s == "./" then
+    return ⟨true, false, pathType, fileType, .cwd⟩
+
   let parts := splitPosixPath s hasPrefixSlash
   let allowParents := ".." ∈ parts
 
   let comps ← parts.filterMapM (parsePathComponentAuto allowParents)
 
-  match NonEmptyList.fromList? comps with
-  | none => throw ParseAutoError.EmptyPath
-  | some neParts =>
-    if h : (PosixPath.components_toString pathType fileType neParts).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX then
-      Except.ok ⟨allowParents, pathType, fileType, ⟨neParts, h⟩⟩
-    else
-      throw ParseAutoError.PathTooLong
+  match PosixPath.mk? comps with
+  | Except.ok p => Except.ok ⟨false, allowParents, pathType, fileType, p⟩
+  | Except.error e => Except.error e
+
+open Lean Elab Term Meta
+
+syntax posixPathNamedArg := "(" ident ":=" term ")"
+syntax "posixPath! " posixPathNamedArg* str : term
+
+elab_rules : term
+| `(posixPath! $[( $ids:ident := $terms:term )]* $s:str) => do
+  let mut apStx? : Option Term := none
+  let mut acStx? : Option Term := none
+  for id in ids, t in terms do
+    if id.getId == `allowParents then apStx? := some t
+    else if id.getId == `allowCwd then acStx? := some t
+    else throwErrorAt id "unknown argument, expected 'allowParents' or 'allowCwd'"
+
+  let str := s.getString
+  let hasPrefixSlash := str.startsWith "/"
+  let pathTypeStx : Term ← if hasPrefixSlash then `(PathType.Abs) else `(PathType.Rel)
+  let fileTypeStx : Term ← if str.endsWith "/" then `(FileType.Dir) else `(FileType.File)
+
+  if str == "." ∨ str == "./" then
+    let acStx ← match acStx? with | some t => pure t | none => `(true)
+    let apStx ← match apStx? with | some t => pure t | none => `(false)
+    let stx ← `( (PosixPath.cwd : PosixPath $apStx $pathTypeStx $fileTypeStx $acStx) )
+    elabTerm stx none
+  else
+    let parts := str.splitOn "/" |>.filter (fun c => c ≠ "." ∧ c ≠ "")
+    let allowParents := parts.contains ".."
+    let allowParentsStx ← match apStx? with
+      | some t => pure t
+      | none => if allowParents then `(true) else `(false)
+    let allowCwdStx ← match acStx? with | some t => pure t | none => `(false)
+
+    if parts.isEmpty then
+      throwError "posixPath! error: Empty path"
+
+    let mut totalSize := parts.foldl (fun acc p => acc + p.utf8ByteSize) 0
+    totalSize := totalSize + parts.length - 1
+    if hasPrefixSlash then totalSize := totalSize + 1
+    if str.endsWith "/" then totalSize := totalSize + 1
+    if totalSize > 4096 then
+      throwError "posixPath! error: Path too long"
+
+    let quoteComp (c : String) : MacroM Term := do
+      if c == ".." then
+        `(PosixComponent.parent)
+      else
+        if c.utf8ByteSize > 255 then
+          Macro.throwError s!"posixPath! error: Component {c} too long"
+        let sStx := quote c
+        `(PosixComponent.normal ({ toNonEmptyString := { toString := $sStx, isNonEmpty := by decide } } : PosixNormalComponent))
+
+    let hdStx ← liftMacroM (quoteComp parts.head!)
+    let rec quoteList : List String → MacroM Term
+      | [] => `([])
+      | x :: xs => do
+        let xStx ← quoteComp x
+        let xsStx ← quoteList xs
+        `( $xStx :: $xsStx )
+
+    let tlStx ← liftMacroM (quoteList parts.tail!)
+    let compsStx ← `( ⟨$hdStx, $tlStx⟩ )
+
+    let stx ← `( (PosixPath.path $compsStx (by decide) : PosixPath $allowParentsStx $pathTypeStx $fileTypeStx $allowCwdStx) )
+    elabTerm stx none

@@ -19,14 +19,14 @@ def checkOkStringAny (x : Except ParseAutoError AnyPosixPath) (expected : String
   | Except.ok p => toString p.path == expected
   | Except.error _ => false
 
-def checkOkStringRaw (x : Except ParseError (PosixPath true .Abs .File)) (expected : String) : Bool :=
+def checkOkStringRaw (x : Except ParseError (PosixPath true .Abs .File false)) (expected : String) : Bool :=
   match x with
   | Except.ok p => toString p == expected
   | Except.error _ => false
 
 -- --- Component-level: NAME_MAX -----------------------------------------
 
-#guard checkOkOption (parsePathComponentWithConfig .Throw true "var") (some (.normal (ValidComponent.mk! "var")))
+#guard checkOkOption (parsePathComponentWithConfig .Throw true "var") (some (.normal (PosixNormalComponent.mk! "var")))
 #guard checkError (parsePathComponentWithConfig .Throw true ".") (ParseError.InvalidComponent ".")
 #guard checkOkOption (parsePathComponentWithConfig .Throw true "..") (some .parent)
 #guard checkError (parsePathComponentWithConfig .Throw false "..") ParseError.ParentWasNotAllowedByPresentInInput
@@ -42,8 +42,8 @@ def checkOkStringRaw (x : Except ParseError (PosixPath true .Abs .File)) (expect
 #guard checkOkStringAny (parsePosixPathAuto "../") "../"
 #guard checkOkStringAny (parsePosixPathAuto ".../") ".../"
 
-#guard checkError (parsePosixPathAuto ".") ParseAutoError.EmptyPath
-#guard checkError (parsePosixPathAuto "./") ParseAutoError.EmptyPath
+#guard checkOkStringAny (parsePosixPathAuto ".") "."
+#guard checkOkStringAny (parsePosixPathAuto "./") "."
 #guard checkError (parsePosixPathAuto "") ParseAutoError.EmptyPath
 
 -- A component that's individually too long fails.
@@ -60,8 +60,8 @@ def tooLongPath : String := "/" ++ String.intercalate "/" (List.replicate 18 lon
 
 -- --- parsePosixPath Explicit Parsing -----------------------------------
 
-def dummyExpected : ExpectedPosixPath := ⟨true, .Abs, .File⟩
-def dummyConfig : Config := ⟨.Throw, .Throw, .Throw, .Throw, .Throw⟩
+def dummyExpected : ExpectedPosixPath := ⟨false, true, .Abs, .File⟩
+def dummyConfig : Config := ⟨true, true, .Throw, .Throw, .Throw, .Throw, .Throw, .Throw⟩
 
 #guard checkOkStringRaw (parsePosixPath dummyExpected dummyConfig "/var/log/syslog") "/var/log/syslog"
 #guard checkError (parsePosixPath dummyExpected dummyConfig "var/log/syslog") ParseError.RequestedAbsButNoSlash

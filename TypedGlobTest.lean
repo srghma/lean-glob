@@ -1,5 +1,5 @@
 module
-public import TypedGlobTest.Spec
+public import TypedGlobTest.GlobRealSpec
 
 @[expose] public section
 

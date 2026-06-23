@@ -14,7 +14,7 @@ elab "patternNonWFStrict" pat:str : term => do
   | .error .emptySegment => throwError s!"invalid non-well-formed pattern: {s}"
   | .error (.invalidRegex _) => throwError s!"invalid regex in pattern: {s}"
 
-#guard ![PatternSegmentNonWF.oneStar] = ![PatternSegmentNonWF.oneStar]
-#guard (PatternNonWF.fromStringStrict "*").toOption = some (![PatternSegmentNonWF.oneStar])
+#guard (![PatternSegmentNonWF.oneStar] : NonEmptyList PatternSegmentNonWF) = (![PatternSegmentNonWF.oneStar] : NonEmptyList PatternSegmentNonWF)
+#guard (PatternNonWF.fromStringStrict "*").toOption = some ((![PatternSegmentNonWF.oneStar] : NonEmptyList PatternSegmentNonWF))
 #guard patternNonWFLax "*" = [PatternSegmentNonWF.oneStar]
-#guard patternNonWFStrict "*" = ![PatternSegmentNonWF.oneStar]
+#guard patternNonWFStrict "*" = (![PatternSegmentNonWF.oneStar] : NonEmptyList PatternSegmentNonWF)
