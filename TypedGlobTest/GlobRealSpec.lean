@@ -5,6 +5,7 @@ public import LSpec
 public import GlobTest.Spec.Core
 public import GlobTest.Spec.Assert
 public import TypedGlob.IO
+public import Glob.Data.Tree
 
 @[expose] public section
 
@@ -36,53 +37,28 @@ def assertTypedGlobWithDirMark (tmpDir : FilePath) (pattern : PatternValidated) 
 /-- Real filesystem specs ported for TypedGlob. -/
 def typedGlobRealSpec : Spec := do
   describe "TypedGlob (real filesystem)" do
-    it "FindRecursive" do withinTempDir fun tmpDir => do
-      writeFile (tmpDir / "foo.txt") "content"
-      createDir (tmpDir / "subdir")
-      writeFile (tmpDir / "subdir/bar.txt") "content"
-      writeFile (tmpDir / "subdir/foo.txt") "content"
-      createDir (tmpDir / "subdir/another_subdir")
-      writeFile (tmpDir / "subdir/another_subdir/bar.txt") "content"
-      writeFile (tmpDir / "subdir/another_subdir/foo.txt") "content"
+    it "FindRecursive" do withinTempDirTree (tree! { "foo.txt", "subdir" { "bar.txt", "foo.txt", "another_subdir" { "bar.txt", "foo.txt" } } }) fun tmpDir => do
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "**/foo.txt") [PatternSegmentNonWF.doubleStar, PatternSegmentNonWF.lit (nes!"foo.txt")]) #["foo.txt", "subdir/foo.txt", "subdir/another_subdir/foo.txt"]
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "foo.txt") [PatternSegmentNonWF.lit (nes!"foo.txt")]) #["foo.txt"]
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "*/foo.txt") [PatternSegmentNonWF.oneStar, PatternSegmentNonWF.lit (nes!"foo.txt")]) #["subdir/foo.txt"]
 
-    it "BasicWildcard" do withinTempDir fun tmpDir => do
-      writeFile (tmpDir / "file1.txt") "content"
-      writeFile (tmpDir / "file2.txt") "content"
-      writeFile (tmpDir / "image.png") "content"
-      createDir (tmpDir / "subdir")
-      writeFile (tmpDir / "subdir/file3.txt") "content"
-      createDir (tmpDir / "empty_dir")
+    it "BasicWildcard" do withinTempDirTree (tree! { "file1.txt", "file2.txt", "image.png", "subdir" { "file3.txt" }, "empty_dir" {} }) fun tmpDir => do
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "*") [PatternSegmentNonWF.oneStar]) #["empty_dir", "file1.txt", "file2.txt", "image.png", "subdir"]
 
-    it "QuestionMark" do withinTempDir fun tmpDir => do
-      writeFile (tmpDir / "doc1") "content"
-      writeFile (tmpDir / "doc2") "content"
-      writeFile (tmpDir / "doc_long") "content"
+    it "QuestionMark" do withinTempDirTree (tree! { "doc1", "doc2", "doc_long" }) fun tmpDir => do
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "doc?") [PatternSegmentNonWF.regex (Regex.parse! "^doc.$")]) #["doc1", "doc2"]
 
-    it "CharacterClass" do withinTempDir fun tmpDir => do
-      writeFile (tmpDir / "apple") "content"
-      writeFile (tmpDir / "apricot") "content"
-      writeFile (tmpDir / "banana") "content"
+    it "CharacterClass" do withinTempDirTree (tree! { "apple", "apricot", "banana" }) fun tmpDir => do
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "a[p-r]*") [PatternSegmentNonWF.regex (Regex.parse! "^a[p-r].*$")]) #["apple", "apricot"]
 
-    it "GlobWithDirMark" do withinTempDir fun tmpDir => do
-      writeFile (tmpDir / "file.txt") "content"
-      createDir (tmpDir / "mydir")
-      createDir (tmpDir / "another_dir")
+    it "GlobWithDirMark" do withinTempDirTree (tree! { "file.txt", "mydir" {}, "another_dir" {} }) fun tmpDir => do
       let expected := #["file.txt", "mydir/", "another_dir/"]
       assertTypedGlobWithDirMark tmpDir (assertAreEqualAndReturnFirst (patternStrict "*") [PatternSegmentNonWF.oneStar]) expected
 
-    it "GlobWithBraces" do withinTempDir fun tmpDir => do
-      writeFile (tmpDir / "config.json") "content"
-      writeFile (tmpDir / "config.yaml") "content"
-      writeFile (tmpDir / "config.txt") "content"
-      writeFile (tmpDir / "data.json") "content"
+    it "GlobWithBraces" do withinTempDirTree (tree! { "config.json", "config.yaml", "config.txt", "data.json" }) fun tmpDir => do
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "config.{json,yaml}") [PatternSegmentNonWF.regex (Regex.parse! "^config\\.(json|yaml)$")]) #["config.json", "config.yaml"]
 
-    it "NoMatchesWithoutNoCheck" do withinTempDir fun tmpDir => do
+    it "NoMatchesWithoutNoCheck" do withinTempDirTree (tree! {}) fun tmpDir => do
       assertTypedGlob tmpDir (assertAreEqualAndReturnFirst (patternStrict "nonexistent.txt") [PatternSegmentNonWF.lit (nes!"nonexistent.txt")]) #[]
 
+end

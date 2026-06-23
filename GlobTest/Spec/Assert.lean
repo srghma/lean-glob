@@ -13,6 +13,7 @@ public import GlobTest.NormalizeReturnsIsValidSpec
 public import Glob.NonWF.Types
 public import LSpec
 public import Glob.WF.IO
+public import Glob.WF.Tree
 
 @[expose] public section
 
@@ -72,7 +73,21 @@ def withinTempDir (act : FilePath → IO α) : IO α := do
   finally
     try IO.FS.removeDirAll dir catch _ => pure ()
 
+partial def createTreeFS (base : FilePath) (t : Tree) : IO Unit := do
+  match t with
+  | Tree.file name =>
+    IO.FS.writeFile (base / name) "content"
+  | Tree.dir name children =>
+    let dir := base / name
+    IO.FS.createDirAll dir
+    for child in children do
+      createTreeFS dir child
 
+def withinTempDirTree (children : List Tree) (act : FilePath → IO α) : IO α := do
+  withinTempDir fun tmpDir => do
+    for child in children do
+      createTreeFS tmpDir child
+    act tmpDir
 
 def assertAreEqualAndReturnFirst (a : PatternValidated) (b : List PatternSegmentNonWF) : PatternValidated :=
   if a.pattern == b then a

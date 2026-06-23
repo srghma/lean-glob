@@ -45,7 +45,7 @@
    "type": "git",
    "subDir": "regex",
    "scope": "",
-   "rev": "a874b47df97df7766fbac35789a98fe64e82ee5f",
+   "rev": "dd3418ead09a7077e5da7450efb1fc5bb7d829de",
    "name": "Regex",
    "manifestFile": "lake-manifest.json",
    "inputRev": "main",

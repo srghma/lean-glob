@@ -2,7 +2,7 @@
 set -e
 
 echo "Building all targets..."
-lake build
+lake build test GlobTest TypedGlobTest
 
 echo "Running tests..."
 lake env lean GlobTest/Main.lean
