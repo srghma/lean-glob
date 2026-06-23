@@ -2,11 +2,11 @@ module
 public import LSpec
 public import Glob.NonWF.Normalize
 public import Glob.WF.Types
-public import GlobTest.LSpec.List
-public import GlobTest.LSpec.NonEmptyList
-public import GlobTest.LSpec.String
-public import GlobTest.LSpec.NonEmptyString
-public import GlobTest.LSpec.PatternSegmentNonWF
+public import LSpecExt.List
+public import LSpecExt.NonEmptyList
+public import LSpecExt.String
+public import LSpecExt.NonEmptyString
+public import LSpecExt.PatternSegmentNonWF
 
 @[expose] public section
 

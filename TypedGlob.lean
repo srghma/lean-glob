@@ -1,6 +1,3 @@
 module
+prelude
 public import TypedGlob.IO
-
-@[expose] public section
-
-end

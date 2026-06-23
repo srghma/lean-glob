@@ -5,8 +5,7 @@ public import NonEmpty.String
 public import NonEmpty.List
 public import NonEmpty.Aliases.FunctorsAndScalars
 public import NonEmpty.List.Upgraders
-public import GlobTest.LSpec.NonEmptyString
-public import Aesop
+public import LSpecExt.NonEmptyString
 
 @[expose] public section
 

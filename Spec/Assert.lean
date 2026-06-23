@@ -9,15 +9,11 @@ public import Init.System.IO
 public import Lean.Elab.Term
 public import Lean.Parser.Term
 public import Init.Data.Repr
-public import GlobTest.NormalizeReturnsIsValidSpec
-public import Glob.NonWF.Types
-public import LSpec
-public import Glob.WF.IO
-public import Glob.WF.Tree
+public import Tree
 
 @[expose] public section
 
-namespace GlobTest.Spec.Assert
+namespace Spec.Assert
 
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
@@ -89,27 +85,6 @@ def withinTempDirTree (children : List Tree) (act : FilePath → IO α) : IO α 
       createTreeFS tmpDir child
     act tmpDir
 
-def assertAreEqualAndReturnFirst (a : PatternValidated) (b : List PatternSegmentNonWF) : PatternValidated :=
-  if a.pattern == b then a
-  else panic! s!"assertAreEqualAndReturnFirst failed: {repr a} != {repr b}"
 
-def assertGlob (tmpDir : FilePath) (pattern : PatternValidated) (expected : Array String) : IO Unit := do
-  match NonEmptyList.fromList? pattern.pattern with
-  | some nel =>
-    let actual ← globFS tmpDir pattern
-    assertEq s!"assertGlob {nel}" expected actual
-  | none => throw (IO.userError "Pattern cannot be empty")
-
-def assertGlobMany (tmpDir : FilePath) (patterns : NonEmptyList PatternValidated) (expected : Array String) : IO Unit := do
-  let mut actual := #[]
-  for p in patterns.toList do
-    let res ← globFS tmpDir p
-    for r in res do
-      if !actual.contains r then
-        actual := actual.push r
-  assertEq s!"assertGlobMany" expected actual
-
-
-
-end GlobTest.Spec.Assert
+end Spec.Assert
 end

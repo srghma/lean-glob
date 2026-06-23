@@ -1,13 +1,13 @@
 module
-public import GlobTest.Spec.Core
-public import GlobTest.Spec.Reporter.Base
+public import Spec.Core
+public import Spec.Reporter.Base
 
 @[expose] public section
 
-namespace GlobTest.Spec.Reporter.Tap
+namespace Spec.Reporter.Tap
 
-open GlobTest.Spec.Core
-open GlobTest.Spec.Reporter.Base
+open Spec.Core
+open Spec.Reporter.Base
 
 /-- Strip `#` from titles so they're TAP-safe. -/
 def escTitle (s : String) : String := s.replace "#" ""
@@ -36,4 +36,4 @@ def tapReporter : ReporterBuilder := do
         IO.println s!"# pass {s.passed + s.pending}"
         IO.println s!"# fail {s.failed}" }
 
-end GlobTest.Spec.Reporter.Tap
+end Spec.Reporter.Tap

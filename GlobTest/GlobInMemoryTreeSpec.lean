@@ -4,14 +4,13 @@ public import NonEmpty.String
 public import NonEmpty.List
 public import NonEmpty.Aliases.FunctorsAndScalars
 public import NonEmpty.List.Upgraders
-public import Glob.Data.Tree
+public import Tree
 public import Glob.WF.IO
 public import Glob.WF.Tree
 public import Init.Data.Repr
 public import Init.System.IO
 public import Lean
-public import GlobTest.NormalizeReturnsIsValidSpec
-public import GlobTest.Spec.Core
+public import Spec.Core
 
 @[expose] public section
 
@@ -19,9 +18,9 @@ open NonEmpty.String NonEmpty.List
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
-open GlobTest.Spec.Core
+open Spec.Core
 
-namespace GlobSpec
+namespace GlobInMemoryTreeSpec
 
 -- Helper to assert glob results match expected Tree
 def assertGlobResult (pattern : String) (tree : Tree) (expected : Option Tree) : IO Unit := do
@@ -224,6 +223,3 @@ def spec : Spec := do
             "foo"  { "bar" { "baz.txt" } },
             "foo2" { "bar" { "qux2.md" } }
           }))
-
-end GlobSpec
-end

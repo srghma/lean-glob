@@ -1,13 +1,13 @@
 module
-public import GlobTest.Spec.Core
-public import GlobTest.Spec.Reporter.Base
+public import Spec.Core
+public import Spec.Reporter.Base
 
 @[expose] public section
 
-namespace GlobTest.Spec.Reporter.Spec
+namespace Spec.Reporter.Spec
 
-open GlobTest.Spec.Core
-open GlobTest.Spec.Reporter.Base
+open Spec.Core
+open Spec.Reporter.Base
 
 /-- Spec reporter: indented suite tree with a checkmark / numbered failure / dash
 per item, plus speed annotation in ms for slow tests. -/
@@ -37,4 +37,4 @@ def specReporter : ReporterBuilder := do
           IO.println (indent depth ++ cyan ("- " ++ res.name))
     , reportSummary := defaultSummary }
 
-end GlobTest.Spec.Reporter.Spec
+end Spec.Reporter.Spec

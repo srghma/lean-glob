@@ -1,3 +1,4 @@
+module
 import TypedPath.PosixPath
 
 open Posix

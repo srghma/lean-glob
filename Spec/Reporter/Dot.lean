@@ -1,13 +1,13 @@
 module
-public import GlobTest.Spec.Core
-public import GlobTest.Spec.Reporter.Base
+public import Spec.Core
+public import Spec.Reporter.Base
 
 @[expose] public section
 
-namespace GlobTest.Spec.Reporter.Dot
+namespace Spec.Reporter.Dot
 
-open GlobTest.Spec.Core
-open GlobTest.Spec.Reporter.Base
+open Spec.Core
+open Spec.Reporter.Base
 
 structure DotReporterConfig where
   width : Nat := 80
@@ -29,4 +29,4 @@ def dotReporter (cfg : DotReporterConfig := {}) : ReporterBuilder := do
         (← IO.getStdout).flush
     , reportSummary := fun _ => IO.println "" }
 
-end GlobTest.Spec.Reporter.Dot
+end Spec.Reporter.Dot

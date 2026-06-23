@@ -1,8 +1,8 @@
 name = "glob"
 version = "0.1.0"
 keywords = ["glob", "pattern", "matching"]
-testDriver = "test"
-defaultTargets = ["Glob"]
+# testDriver = "GlobTest" # disabled, use run_tests.sh
+# defaultTargets = ["Glob"]
 
 [[require]]
 name = "Regex"
@@ -35,6 +35,22 @@ git = "https://github.com/srghma/LSpec"
 rev = "main"
 
 [[lean_lib]]
+name = "Tree"
+roots = ["Tree"]
+
+[[lean_lib]]
+name = "Cutter"
+roots = ["Cutter"]
+
+[[lean_lib]]
+name = "LSpecExt"
+roots = ["LSpecExt"]
+
+[[lean_lib]]
+name = "Spec"
+roots = ["Spec"]
+
+[[lean_lib]]
 name = "Glob"
 roots = ["Glob"]
 
@@ -55,7 +71,7 @@ name = "Pathy"
 roots = ["Pathy"]
 
 [[lean_exe]]
-name = "test"
+name = "glob_test"
 root = "GlobTest.Main"
 
 [[lean_lib]]
@@ -65,3 +81,7 @@ roots = ["TypedGlob"]
 [[lean_lib]]
 name = "TypedGlobTest"
 roots = ["TypedGlobTest"]
+
+[[lean_exe]]
+name = "typed_glob_test"
+root = "TypedGlobTest.Main"

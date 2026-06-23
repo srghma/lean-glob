@@ -1,13 +1,13 @@
 module
-public import GlobTest.Spec.Core
-public import GlobTest.Spec.Reporter.Base
+public import Spec.Core
+public import Spec.Reporter.Base
 
 @[expose] public section
 
-namespace GlobTest.Spec.Reporter.Console
+namespace Spec.Reporter.Console
 
-open GlobTest.Spec.Core
-open GlobTest.Spec.Reporter.Base
+open Spec.Core
+open Spec.Reporter.Base
 
 /-- Console reporter: prints each suite path once (when it changes), then a line
 per test under it. Per-item output is already serialized by the runner, so this
@@ -32,5 +32,3 @@ def consoleReporter : ReporterBuilder := do
         | .pending =>
           IO.println ("  " ++ cyan ("~ " ++ res.name))
     , reportSummary := defaultSummary }
-
-end GlobTest.Spec.Reporter.Console

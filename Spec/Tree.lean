@@ -1,5 +1,5 @@
 module
-public import Glob.Data.Tree
+public import Tree
 public import Init.System.IO
 
 @[expose] public section

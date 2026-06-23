@@ -50,9 +50,27 @@ structure PosixNormalComponent extends NonEmptyString where
   not_parent : toString ≠ ".." := by decide
   no_slash : toString.contains '/' = false :=
     by simp_all only [↓Char.isValue, String.contains_char_eq, String.reduceToList, List.mem_cons, Char.reduceEq, List.not_mem_nil, or_self, decide_false]
-deriving DecidableEq
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 instance : ToString PosixNormalComponent := ⟨(·.toString)⟩
+
+instance : LT PosixNormalComponent where
+  lt a b := a.toNonEmptyString < b.toNonEmptyString
+
+instance : LE PosixNormalComponent where
+  le a b := a.toNonEmptyString ≤ b.toNonEmptyString
+
+instance (a b : PosixNormalComponent) : Decidable (a < b) :=
+  inferInstanceAs (Decidable (a.toNonEmptyString < b.toNonEmptyString))
+
+instance (a b : PosixNormalComponent) : Decidable (a ≤ b) :=
+  inferInstanceAs (Decidable (a.toNonEmptyString ≤ b.toNonEmptyString))
+
+instance : Min PosixNormalComponent where
+  min a b := if a ≤ b then a else b
+
+instance : Max PosixNormalComponent where
+  max a b := if a ≤ b then b else a
 
 namespace PosixNormalComponent
 
@@ -84,13 +102,31 @@ end PosixNormalComponent
 inductive PosixComponent : Bool → Type where
   | parent : PosixComponent true             -- ".."
   | normal (name : PosixNormalComponent) : PosixComponent allowParents -- a validated file/directory name
-deriving DecidableEq
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 def PosixComponent.toNonEmptyString : PosixComponent allowParents → NonEmptyString
   | .parent   => ⟨"..", by decide⟩
   | .normal n => n.toNonEmptyString
 
 instance : ToString (PosixComponent allowParents) := ⟨(·.toNonEmptyString.toString)⟩
+
+instance {ap} : LT (PosixComponent ap) where
+  lt a b := compare a b == .lt
+
+instance {ap} : LE (PosixComponent ap) where
+  le a b := compare a b != .gt
+
+instance {ap} (a b : PosixComponent ap) : Decidable (a < b) :=
+  inferInstanceAs (Decidable (compare a b == .lt))
+
+instance {ap} (a b : PosixComponent ap) : Decidable (a ≤ b) :=
+  inferInstanceAs (Decidable (compare a b != .gt))
+
+instance {ap} : Min (PosixComponent ap) where
+  min a b := if a ≤ b then a else b
+
+instance {ap} : Max (PosixComponent ap) where
+  max a b := if a ≤ b then b else a
 
 /-- Parses a single path component. `.` and `..` are recognised specially
     (they're not subject to `NAME_MAX` — the kernel treats them as fixed
@@ -121,7 +157,7 @@ inductive PosixPath (allowParents : Bool) (pathType : PathType) (fileType : File
     (components : NonEmptyList (PosixComponent allowParents))
     (size_le : (PosixPath.components_toString pathType fileType components).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX)
     : PosixPath allowParents pathType fileType allowCwd
-deriving DecidableEq
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 instance : ToString (PosixPath allowParents pathType fileType allowCwd) :=
   ⟨fun
@@ -133,37 +169,37 @@ structure ExpectedPosixPath where
   allowParents : Bool
   pathType : PathType
   fileType : FileType
-deriving BEq, Inhabited, DecidableEq
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 inductive IfCwdNotAllowedButInputIsCwd where
   | Throw
   | Skip
-deriving BEq, Inhabited, DecidableEq, Repr
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 inductive IfParentsNotAllowedButHaveParent where
   | Throw
   | Skip
-deriving BEq, Inhabited, DecidableEq, Repr
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 inductive IfRequestedRelButStartsWithSlash where
   | Throw
   | DropSlash
-deriving BEq, Inhabited, DecidableEq, Repr
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 inductive IfRequestedAbsButNoSlash where
   | Throw
   | StillMakeAbs
-deriving BEq, Inhabited, DecidableEq, Repr
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 inductive IfRequestedDirButNoTrailingSlash where
   | Throw
   | StillMakeDir
-deriving BEq, Inhabited, DecidableEq, Repr
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 inductive IfRequestedFileButTrailingSlash where
   | Throw
   | DropTrailingSlash
-deriving BEq, Inhabited, DecidableEq, Repr
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 structure Config where
   allowTrailingSeparator : Bool
@@ -174,13 +210,13 @@ structure Config where
   ifRequestedAbsButNoSlash : IfRequestedAbsButNoSlash
   ifRequestedDirButNoTrailingSlash : IfRequestedDirButNoTrailingSlash
   ifRequestedFileButTrailingSlash : IfRequestedFileButTrailingSlash
-deriving BEq, Inhabited
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 inductive ParseAutoError where
   | EmptyPath
   | InvalidComponent (name : String)
   | PathTooLong
-deriving BEq, DecidableEq, Repr
+deriving BEq, Hashable, Ord, Repr, DecidableEq, ReflBEq, LawfulBEq
 
 instance : ToString ParseAutoError where
   toString
@@ -251,6 +287,22 @@ def PosixPath.mk? {allowCwd allowParents pathType fileType} (comps : List (Posix
       Except.ok (.path neParts h)
     else
       Except.error ParseAutoError.PathTooLong
+
+/-- Append one validated component to an existing path, changing its `FileType`
+    to `newFt`. Returns `none` only if the resulting path would exceed PATH_MAX. -/
+def PosixPath.appendNormalComponent? {allowParents pathType fileType allowCwd}
+    (p : PosixPath allowParents pathType fileType allowCwd)
+    (c : PosixNormalComponent)
+    (newFt : FileType) : Option (PosixPath allowParents pathType newFt false) :=
+  let newComps : NonEmptyList (PosixComponent allowParents) :=
+    match p with
+    | .cwd    => { head := PosixComponent.normal (allowParents := allowParents) c, tail := [] }
+    | .path cs _ => { head := cs.head, tail := cs.tail ++ [PosixComponent.normal c] }
+  if h : (PosixPath.components_toString pathType newFt newComps).utf8ByteSize ≤ POSIX_WHOLE_PATH_MAX then
+    some (.path newComps h)
+  else
+    none
+
 
 /-- Parses every component of a `/`-separated path, failing the whole parse
     if *any* component violates `NAME_MAX`. Also checks that the whole

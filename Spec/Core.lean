@@ -5,7 +5,7 @@ public import Std.Sync.Mutex
 open IO
 
 /-!
-# GlobTest.Spec.Core
+# Spec.Core
 
 A minimal port of purescript-spec / rspec to Lean 4.
 
@@ -27,7 +27,7 @@ per-item output and flush it atomically once an item finishes, keeping the
 report readable even when the work itself overlaps.
 -/
 
-namespace GlobTest.Spec.Core
+namespace Spec.Core
 
 @[expose] public section
 
@@ -392,4 +392,4 @@ def shouldReturn [BEq α] [Repr α] (actual : IO α) (expected : α) : IO Unit :
   shouldEqual (← actual) expected
 
 end
-end GlobTest.Spec.Core
+end Spec.Core

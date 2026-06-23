@@ -4,8 +4,8 @@ public import NonEmpty.List
 public import NonEmpty.Aliases.FunctorsAndScalars
 public import NonEmpty.List.Upgraders
 public import Glob.WF.Elab
-public import Glob.Data.Tree
-public meta import Glob.Data.Tree
+public import Tree
+public meta import Tree
 public import Lean.Elab.Command
 
 @[expose] public section

@@ -1,11 +1,11 @@
 module
-public import GlobTest.Spec.Core
+public import Spec.Core
 
 @[expose] public section
 
-namespace GlobTest.Spec.Reporter.Base
+namespace Spec.Reporter.Base
 
-open GlobTest.Spec.Core
+open Spec.Core
 
 set_option autoImplicit false
 
@@ -33,7 +33,7 @@ structure Summary where
   failed : Nat := 0
   pending : Nat := 0
 
-def summarize (results : Array GlobTest.Spec.Core.ItemResult) : Summary :=
+def summarize (results : Array Spec.Core.ItemResult) : Summary :=
   results.foldl (init := {}) fun acc r =>
     match r.outcome with
     | .success => { acc with passed := acc.passed + 1 }
@@ -41,7 +41,7 @@ def summarize (results : Array GlobTest.Spec.Core.ItemResult) : Summary :=
     | .pending => { acc with pending := acc.pending + 1 }
 
 /-- Default summary block reused by the console/spec reporters. -/
-def defaultSummary (results : Array GlobTest.Spec.Core.ItemResult) : IO Unit := do
+def defaultSummary (results : Array Spec.Core.ItemResult) : IO Unit := do
   let s := summarize results
   let total := s.passed + s.failed
   IO.println ""
@@ -52,4 +52,4 @@ def defaultSummary (results : Array GlobTest.Spec.Core.ItemResult) : IO Unit := 
     IO.println (yellow s!"{s.pending} {pluralize "test" s.pending} pending")
   IO.println ""
 
-end GlobTest.Spec.Reporter.Base
+end Spec.Reporter.Base

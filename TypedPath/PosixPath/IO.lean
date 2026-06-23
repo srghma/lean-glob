@@ -134,6 +134,12 @@ def readDir (p : AnyDir ap pt ac) : _root_.IO (Array (PosixDirEntry (ap:=ap) (pt
   let entries ← _root_.System.FilePath.readDir p.toFilePath
   return entries.map (fun e => { root := p, fileName := (PosixNormalComponent.mk? e.fileName).get! })
 
+def readDirWithMetadata (p : AnyDir ap pt ac) : _root_.IO (Array (PosixDirEntry (ap:=ap) (pt:=pt) (ac:=ac) × _root_.IO.FS.Metadata)) := do
+  let entries ← readDir p
+  entries.mapM (fun e => do
+    let md ← e.metadata
+    return (e, md))
+
 -- #eval show _root_.IO Unit from do
 --   let td ← _root_.IO.FS.createTempDir
 --   _root_.IO.FS.createDir (td / "foo")
