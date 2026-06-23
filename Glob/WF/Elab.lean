@@ -26,10 +26,13 @@ elab "patternLax" pat:str : term => do
   | .error e => throwError e.toHumanReadable
   | .ok pat => return (Lean.toExpr pat)
 
+-- TODO: patternStrict -> glob (can have option `normalize` which means it will be lax). patternNonWF -> glob_impl
+-- TODO: normalization always gives valid?
 elab "patternStrict" pat:str : term => do
   match PatternValidated.patternStrict? pat.getString with
   | .error e => throwError e
   | .ok pat => return (Lean.toExpr pat)
+-- TODO: parse to `inductive ... where | glob GlobVal | envVar; struct ... where startsWithHome : Bool; components : List ...`
 
 elab "patternStrictWithEnvVars" pat:str : term => do
   match PatternValidated.patternStrictWithEnvVars? pat.getString with

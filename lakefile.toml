@@ -18,21 +18,21 @@ git = "https://github.com/srghma/lean-nonempty.git"
 rev = "main"
 # rev = "43dc93d470e73ce64d1bbdd074f0454c7c9bbfc7"
 
-[[require]]
-name = "batteries"
-scope = "leanprover-community"
-rev = "v4.31.0"
+# [[require]]
+# name = "batteries"
+# scope = "leanprover-community"
+# rev = "v4.31.0"
 
-[[require]]
-name = "aesop"
-scope = "leanprover-community"
-rev = "v4.31.0"
+# [[require]]
+# name = "aesop"
+# scope = "leanprover-community"
+# rev = "v4.31.0"
 
-[[require]]
-name = "LSpec"
-git = "https://github.com/srghma/LSpec"
-# git = "https://github.com/argumentcomputer/LSpec"
-rev = "main"
+# [[require]]
+# name = "LSpec"
+# git = "https://github.com/srghma/LSpec"
+# # git = "https://github.com/argumentcomputer/LSpec"
+# rev = "main"
 
 [[lean_lib]]
 name = "Tree"
@@ -42,9 +42,9 @@ roots = ["Tree"]
 name = "Cutter"
 roots = ["Cutter"]
 
-[[lean_lib]]
-name = "LSpecExt"
-roots = ["LSpecExt"]
+# [[lean_lib]]
+# name = "LSpecExt"
+# roots = ["LSpecExt"]
 
 [[lean_lib]]
 name = "Spec"

@@ -347,7 +347,7 @@ def runLeaves (cfg : Config) (reporters : List Reporter) (leaves : Array (Leaf U
 def saveFailures (results : Array ItemResult) : IO Unit := do
   let failed := results.filterMap fun r =>
     if isFailure r.outcome then some (String.intercalate " » " (r.path.toList ++ [r.name])) else none
-  IO.FS.writeFile failuresFile (String.intercalate "\n" failed.toList)
+  unless failed.isEmpty do IO.FS.writeFile failuresFile (String.intercalate "\n" failed.toList)
 
 def loadFailures : IO (Array String) := do
   try

@@ -9,7 +9,6 @@ public import Init.System.IO
 public import Lean.Elab.Term
 public import Lean.Parser.Term
 public import Init.Data.Repr
-public import Tree
 
 @[expose] public section
 
@@ -18,7 +17,6 @@ namespace Spec.Assert
 open IO.FS
 open IO.FS (DirEntry FileType Metadata)
 open System (FilePath)
-open NonEmpty.List
 
 -- Helper for comparing arrays of strings, ignoring order
 def _root_.Array.sortedEq (arr1 arr2 : Array String) : Bool :=
@@ -69,21 +67,6 @@ def withinTempDir (act : FilePath → IO α) : IO α := do
   finally
     try IO.FS.removeDirAll dir catch _ => pure ()
 
-partial def createTreeFS (base : FilePath) (t : Tree) : IO Unit := do
-  match t with
-  | Tree.file name =>
-    IO.FS.writeFile (base / name) "content"
-  | Tree.dir name children =>
-    let dir := base / name
-    IO.FS.createDirAll dir
-    for child in children do
-      createTreeFS dir child
-
-def withinTempDirTree (children : List Tree) (act : FilePath → IO α) : IO α := do
-  withinTempDir fun tmpDir => do
-    for child in children do
-      createTreeFS tmpDir child
-    act tmpDir
 
 
 end Spec.Assert

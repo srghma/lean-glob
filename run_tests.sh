@@ -11,8 +11,8 @@ echo "--- Building Cutter ---"
 lake build Cutter
 
 # many-files libs (root file imports whole tree)
-echo "--- Building LSpecExt ---"
-lake build LSpecExt
+# echo "--- Building LSpecExt ---"
+# lake build LSpecExt
 
 echo "--- Building Spec ---"
 lake build Spec

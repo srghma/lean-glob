@@ -1,7 +1,6 @@
 module
 public import Init.System.IO
 public import Init.System.FilePath
-public import LSpec
 public import Spec.Core
 public import Spec.Assert
 public import TypedGlob.IO

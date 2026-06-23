@@ -1,5 +1,5 @@
-# glob-posix
+# lean-glob
 
-This lib is same like https://github.com/rdnetto/glob-posix
+check TypedPath: for now only PosixPath allows/disallowes .. or . inside (WindowsPath - no), I am still thinking if this is ok UI.
 
-NOTE: it cannot recurse into subdirs, so instead of one `**/*.txt` You will have to write `*.txt`, `**/*.txt`, `**/**/*.txt`
+TODO: rename patternStrict! elab for glob to glob! (this is glob that doesnt allow to write `**/*/foo`, but only `*/**/foo`)

@@ -134,6 +134,12 @@ def readDir (p : AnyDir ap pt ac) : _root_.IO (Array (PosixDirEntry (ap:=ap) (pt
   let entries ← _root_.System.FilePath.readDir p.toFilePath
   return entries.map (fun e => { root := p, fileName := (PosixNormalComponent.mk? e.fileName).get! })
 
+-- def mapMParallel {α β : Type} (f : α → _root_.IO β) (as : Array α) : _root_.IO (Array β) := do
+--   let tasks ← as.mapM fun a => _root_.IO.asTask (f a)
+--   Array.zip (Array.range as.size) tasks
+--   |> Array.mapM (fun (_, t) => t.get)
+
+-- TODO: in parallel. But actually dont use it
 def readDirWithMetadata (p : AnyDir ap pt ac) : _root_.IO (Array (PosixDirEntry (ap:=ap) (pt:=pt) (ac:=ac) × _root_.IO.FS.Metadata)) := do
   let entries ← readDir p
   entries.mapM (fun e => do
